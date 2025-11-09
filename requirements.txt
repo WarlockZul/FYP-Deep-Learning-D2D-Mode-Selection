@@ -1,0 +1,21 @@
+# Core Data Science and Math Libraries
+numpy>=1.20.0  
+pandas>=2.0.0  
+scipy>=1.8.0   
+
+# Deep Learning Framework 
+tensorflow-cpu # For CPU-only installations
+# python -m pip install "tensorflow<2.11" # For Windows Native with GPU support
+# python -m pip install tensorflow # For macOS with M1/M2 GPU support
+# python -m pip install 'tensorflow[and-cuda]' # For Linux with NVIDIA GPU support
+# python3 -m pip install tf-nightly # For the latest nightly build
+
+# Machine Learning and Statistical Libraries
+scikit-learn>=1.0  
+statsmodels>=0.13  
+xgboost>=1.6.0
+
+# Visualization and Notebooks
+matplotlib>=3.5.0  
+seaborn>=0.12.0    
+jupyterlab>=4.0    
