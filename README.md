@@ -1,0 +1,18 @@
+## Simulator Folder
+### config.py
+- `NUM_EPISODES`: Have multiple episodes to prevent the model from overfit to the specific path those two users took (e.g., "always walking North"). By running 50 short episodes, you force the model to learn from 50 different starting scenarios and locations.
+- `D2D_MAX_DIST_M`: This parameter is used solely for Initialization (Scenario Generation). We force the simulation to start with the devices relatively close (within 50m) so that D2D is actually a viable candidate at the beginning. As they move (using the Random Waypoint model), they might drift apart, causing the optimal mode to switch from D2D $\rightarrow$ Cellular. Capturing that switch is exactly what we need the AI to learn.
+- `SEED=42`: Every time you run generate_data.py, the users will spawn in the exact same locations, move in the exact same direction, and experience the exact same fading values. Keep it fixed (e.g., 42) so you can verify your changes. The project guidelines explicitly suggest performing simulation runs with "different random seeds" to ensure your results are robust and not just a fluke of one specific scenario.
+- `INTERFERENCE_LOAD_FACTOR`: n real LTE/5G networks, users don't always transmit 100% of the time on all frequencies. If $\rho_k$ is 0.7, it means the interferer is only active 70% of the time (or uses 70% of the bandwidth), effectively reducing the interference you suffer.
+- `NOISE_POWER_DBM`: Johnson-Nyquist Noise Formula. -174 dBm is the standard thermal noise value for 1 Hz and in room temperature. 
+
+### channel_model.py
+- `get_shadowing`: Low Sigma (4 dB): A clean environment (e.g., a park). The signal fluctuates a little bit. High Sigma (8 dB): A dense urban city. The signal fluctuates wildly (deep shadows behind skyscrapers). When I selected 6, I simply picked the average of the recommended range (4 to 8) to represent a "typical" suburban/urban environment. To make your AI robust, you can pick a random $\sigma$ at the start of each episode. Using a fixed 6 is perfectly fine for a baseline. It's better to keep it fixed first so you know your code works, then add the complexity later.
+- `get_rayleigh_fading_gain`: Rayleigh Fading describes the Amplitude (Voltage, $V$) of the received signal. The probability distribution of $V$ is a Rayleigh Distribution. However, your simulator tracks Power (Watts, $P$).Power is proportional to amplitude squared ($P \propto V^2$). If a variable $V$ follows a Rayleigh Distribution, then its square $V^2$ follows an Exponential Distribution. Since we are simulating Power directly (Watts), we skip the "Voltage" step and sample directly from the Exponential Distribution.
+- `rx_power_watts`: First, convert P(dBm) to P(mW). Second, convert P(mW) to P(W). Third, combine both equations to get final equation. 
+
+### entities.py
+- `_get_random_point_in_cell`: If you use radius = R * random(), you are giving the tiny center the same probability of getting a user as the huge outer ring. Result: All your users will cluster tightly around the Base Station in the middle. The outer edges of your cell will be empty. To counteract this "squaring" effect of the area, we must take the square root of the random number. This pushes more users toward the edge, exactly balancing out the larger area there. The result is a perfectly even distribution of users across the entire map.
+
+### environment.py
+- 

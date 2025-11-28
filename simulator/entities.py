@@ -1,83 +1,88 @@
 import numpy as np
 from simulator.config import SimulationConfig
 
+# Represents the cellular Base Station (BS).
 class BaseStation:
-    """
-    Represents the cellular Base Station (BS).
-    Located at the center (0,0) of the cell.
-    """
+    # Located at the center (0,0) of the cell.
     def __init__(self):
-        # BS is always at coordinate (0,0)
         self.position = np.array([0.0, 0.0])
         self.tx_power_dbm = SimulationConfig.TX_POWER_BS_DBM
 
+    # Calculates Euclidean distance to another entity (UE)
     def get_distance_to(self, other_entity):
-        """Calculates Euclidean distance to another entity (UE)"""
         return np.linalg.norm(self.position - other_entity.position)
 
+# Represents a mobile device, or user equipement (UE).
 class UserEquipment:
-    """
-    Represents a mobile device (UE).
-    Can function as a cellular user or a D2D transmitter/receiver.
-    """
     def __init__(self, device_id, speed_type='mixed'):
+        # Initialize Device ID
         self.device_id = device_id
         
-        # 1. Initialize Position (Uniformly distributed in circle)
-        # r = R * sqrt(random) accounts for area density
-        radius = SimulationConfig.CELL_RADIUS_M * np.sqrt(np.random.rand())
-        angle = 2 * np.pi * np.random.rand()
+        # Initialize Start Position
+        self.position = self._get_random_point_in_cell()
         
-        self.position = np.array([
-            radius * np.cos(angle),
-            radius * np.sin(angle)
-        ])
+        # Initialize Random Waypoint Destination
+        self.destination = self._get_random_point_in_cell()
+
+        # Initialize State Flag: True = Paused, False = Moving
+        self.is_paused = False
         
-        # 2. Initialize Speed and Direction
-        self.direction = np.random.uniform(0, 2 * np.pi) # Radians
-        
-        # Assign speed based on type [cite: 54]
+        # Initialize Speed: Pedestrian (1-3 ms), Vehicle (3-10 ms), or Mixed (1-10 ms)
         if speed_type == 'pedestrian':
             self.speed = np.random.uniform(1, 3)
         elif speed_type == 'vehicle':
             self.speed = np.random.uniform(3, 10)
         else:
-            # Mixed scenario
             self.speed = np.random.uniform(SimulationConfig.SPEED_MIN, SimulationConfig.SPEED_MAX)
             
+        # Initialize Transmit Power
         self.tx_power_dbm = SimulationConfig.TX_POWER_D2D_DBM
         
+    # Picks a new random point within the cell
+    def _get_random_point_in_cell(self):
+        # r = R * sqrt(random) ensures uniform distribution in a circle
+        radius = SimulationConfig.CELL_RADIUS_M * np.sqrt(np.random.rand())
+        angle = 2 * np.pi * np.random.rand()
+        return np.array([radius * np.cos(angle), radius * np.sin(angle)])
+
+    # Updates position based on Random Waypoint Mobility Model.
     def move(self):
-        """
-        Updates position based on speed and direction (1 time step).
-        Implements simple boundary checking.
-        """
+        # --- CASE 1: PAUSED ---
+        if self.is_paused:
+            # Check probability to start moving
+            if np.random.rand() < SimulationConfig.PROBABILITY_START_MOVING:
+                # Start moving to a new random destination
+                self.is_paused = False
+                self.destination = self._get_random_point_in_cell()
+            else:
+                # Stay paused at current position
+                return 
+
+        # --- CASE 2: MOVING ---
         dt = SimulationConfig.TIME_STEP_S
         
-        # Calculate displacement
-        dx = self.speed * np.cos(self.direction) * dt
-        dy = self.speed * np.sin(self.direction) * dt
-        
-        new_position = self.position + np.array([dx, dy])
-        
-        # Boundary Check: Ensure device stays within Cell Radius
-        dist_from_center = np.linalg.norm(new_position)
-        
-        if dist_from_center > SimulationConfig.CELL_RADIUS_M:
-            # If out of bounds, bounce back (turn 180 degrees + random noise)
-            self.direction = self.direction + np.pi + np.random.uniform(-0.5, 0.5)
-            
-            # Clamp position to boundary to prevent escaping
-            # Normalize vector and multiply by radius
-            new_position = (new_position / dist_from_center) * SimulationConfig.CELL_RADIUS_M
-            
-        self.position = new_position
-        
-        # Randomly adjust direction slightly to simulate realistic wandering
-        # 20% chance to change direction by up to +/- 30 degrees (approx 0.5 rad)
-        if np.random.rand() < 0.2:
-            self.direction += np.random.uniform(-0.5, 0.5)
+        # Calculate direction vector to destination
+        direction_vector = self.destination - self.position
 
+        # Calculate distance to destination
+        distance_to_dest = np.linalg.norm(direction_vector)
+        
+        # Calculate step distance
+        step_distance = self.speed * dt
+        
+        # Check if we reach the destination or overshoot
+        if step_distance >= distance_to_dest:
+            # Correct overshoot position to exact destination
+            self.position = self.destination
+
+            # Transition to PAUSE state/stop moving
+            self.is_paused = True
+            
+        else:
+            # Continue moving towards destination
+            unit_vector = direction_vector / distance_to_dest
+            self.position = self.position + (unit_vector * step_distance)
+
+    # Calculates Euclidean distance to another entity (BS or UE)
     def get_distance_to(self, other_entity):
-        """Calculates Euclidean distance to another entity (BS or UE)"""
         return np.linalg.norm(self.position - other_entity.position)
