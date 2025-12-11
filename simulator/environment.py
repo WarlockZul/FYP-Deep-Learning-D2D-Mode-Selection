@@ -29,7 +29,7 @@ class D2DEnvironment:
         rx_pos = self.d2d_tx.position + np.array([radius * np.cos(angle), radius * np.sin(angle)])
         self.d2d_rx.position = rx_pos 
         
-        # Create Interfering Devices
+        # Create Interfering Devices with moderate speed (10 to 20 interferers)
         num_interferers = np.random.randint(10, 21)
         self.interferers = [UserEquipment(f"Int_{i}", speed_type='vehicle') for i in range(num_interferers)]
         
