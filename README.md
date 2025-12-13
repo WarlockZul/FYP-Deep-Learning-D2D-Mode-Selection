@@ -15,4 +15,5 @@
 - `_get_random_point_in_cell`: If you use radius = R * random(), you are giving the tiny center the same probability of getting a user as the huge outer ring. Result: All your users will cluster tightly around the Base Station in the middle. The outer edges of your cell will be empty. To counteract this "squaring" effect of the area, we must take the square root of the random number. This pushes more users toward the edge, exactly balancing out the larger area there. The result is a perfectly even distribution of users across the entire map.
 
 ### environment.py
-- 
+- `reset`: Resets simulation for a new episode (or a new scenario). Create new D2D pair, spawn them within set max distance, and create new set of interferers (10-20 devices). 
+- `step`: Simulate environment for 1 second. It will (1) Move Tx and Rx. (2) Calculate distance between entities. (3) Calculate power of received signal. (4) Calculate SINR (Interference + Noise). (5) Calculate throughput. (6) Choose optimal mode. (7) Pack data into proper format. 
