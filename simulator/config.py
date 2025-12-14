@@ -50,7 +50,8 @@ class SimulationConfig:
     
     # --- Mobility & Environment ---
     TIME_STEP_S = 1                 # Delta t = 1s
-    NUM_INTERFERING_DEVICES = 20    # Number of interferers per time step
+    MIN_NUM_INTERFERER = 10         # Min number of interferers per time step
+    MAX_NUM_INTERFERER = 20         # Max number of interferers per time step
     
     # Speed ranges (m/s)
     SPEED_MIN = 1                   # Pedestrian
@@ -66,7 +67,7 @@ class SimulationConfig:
     def get_bs_power_watts():
         return 10 ** ((SimulationConfig.TX_POWER_BS_DBM - 30) / 10)
 
-    # Helper to convert D2D dBm to Watts
+    # Helper to convert D2D Tx dBm to Watts
     @staticmethod
     def get_d2d_power_watts():
         return 10 ** ((SimulationConfig.TX_POWER_D2D_DBM - 30) / 10)

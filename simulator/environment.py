@@ -30,7 +30,9 @@ class D2DEnvironment:
         self.d2d_rx.position = rx_pos 
         
         # Create Interfering Devices with moderate speed (10 to 20 interferers)
-        num_interferers = np.random.randint(10, 21)
+        num_interferers = np.random.randint(
+            SimulationConfig.MIN_NUM_INTERFERER, SimulationConfig.MAX_NUM_INTERFERER + 1
+        )
         self.interferers = [UserEquipment(f"Int_{i}", speed_type='vehicle') for i in range(num_interferers)]
         
         return self.get_state()
@@ -71,10 +73,12 @@ class D2DEnvironment:
                 interferer.tx_power_dbm, dist_int_to_rx, is_d2d=True
             )
             
-            # Apply Load Factor (Rho): sum(rho * P * G)
+            # Apply Load Factor (Rho): sum(rho_k * P_k * G_kj) 
+            # NOTE: [Refer to research paper]
             total_interference_watts += (rho * raw_interference_watts)
             
-        # Calculate Noise Power (Watts) 
+        # Calculate Noise Power (Watts) (Sigma^2)
+        # NOTE: [Refer to research paper]
         noise_watts = SimulationConfig.get_noise_power_watts()
         
         # Calculate SINR in linear scale and then convert to dB

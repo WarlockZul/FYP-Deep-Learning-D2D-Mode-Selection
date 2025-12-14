@@ -10,6 +10,7 @@ class ChannelModel:
         distance_km = distance_m / 1000.0
         
         # Cellular Path Loss Equation: 128.1 + 37.6 * log10(d_km)
+        # NOTE: [Refer to proposal document]
         pl = SimulationConfig.PATH_LOSS_CELLULAR_A + \
              (SimulationConfig.PATH_LOSS_CELLULAR_B * np.log10(distance_km))
         return pl
@@ -24,8 +25,8 @@ class ChannelModel:
         # Initialize carrier frequency 
         freq_mhz = SimulationConfig.CARRIER_FREQ_MHZ
         
-        # Based on standard Free Space Path Loss structure for d in km and f in MHz:
         # D2D Path Loss Equation: 32.45 + 20 * log10(f in MHz) + 20 * log10(d in km)
+        # NOTE: [Refer to proposal document]
         pl = SimulationConfig.PATH_LOSS_D2D_A + \
              (SimulationConfig.PATH_LOSS_D2D_B_FREQ * np.log10(freq_mhz)) + \
              (SimulationConfig.PATH_LOSS_D2D_C_DIST * np.log10(distance_km))
@@ -59,6 +60,8 @@ class ChannelModel:
         return np.random.exponential(scale=1.0)
 
     # Helper to compute final received power in Watts considering all channel effects.
+    # `tx_power_dbm`: Transmit power in dBm (P_i)
+    # NOTE: [Refer to research paper]
     @staticmethod
     def compute_received_power(tx_power_dbm, distance_m, is_d2d=False):
         # Calculate Path Loss (dB)
@@ -78,6 +81,7 @@ class ChannelModel:
         rx_power_watts = 10 ** ((rx_power_dbm - 30) / 10)
         
         # Apply Small-scale Rayleigh Fading (Linear multiplication)
+        # Transmission Power x Channel Gain (P_i x G_ij)
         fading_gain = ChannelModel.get_rayleigh_fading_gain()
         final_rx_power_watts = rx_power_watts * fading_gain
         
