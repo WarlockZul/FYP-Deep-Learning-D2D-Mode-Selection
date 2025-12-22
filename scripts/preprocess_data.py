@@ -108,10 +108,10 @@ def preprocess_data():
     # Save .npy files
     os.makedirs("data/processed", exist_ok=True)
     np.save("data/processed/X_train.npy", X_train)
-    np.save("data/processed/X_val.npy", X_val)   # <--- New Validation File
+    np.save("data/processed/X_val.npy", X_val)   
     np.save("data/processed/X_test.npy", X_test)
     np.save("data/processed/y_train.npy", y_train)
-    np.save("data/processed/y_val.npy", y_val)   # <--- New Validation File
+    np.save("data/processed/y_val.npy", y_val)   
     np.save("data/processed/y_test.npy", y_test)
     
     print("Processed data saved to data/processed/")
