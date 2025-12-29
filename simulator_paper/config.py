@@ -2,24 +2,23 @@ import numpy as np
 
 class PaperConfig:
     # Simulation Settings 
-    NUM_EPISODES = 50               # How many separate 100-second runs to do
+    NUM_EPISODES = 100              # How many separate 100-second runs to do
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
-    D2D_MAX_DIST_M = 50             # Maximum distance to consider D2D pairing feasible
+    D2D_MAX_DIST_M = 500            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
     OUTPUT_FILE = "data/test_simulation_data.csv"
     
     # Mobility Settings
-    PROBABILITY_START_MOVING = 0.10 # Probability that a UE starts moving in a time step
+    PROBABILITY_START_MOVING = 1.00 # Probability that a UE starts moving in a time step
 
     # Channel Model Settings
-    INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
-    BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
+    INTERFERENCE_LOAD_FACTOR = 0.1  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
+    BANDWIDTH_HZ = 20e6             # System Bandwidth (10 MHz is standard for LTE)
 
     #####################################################################################################
 
     # General Network Settings
     CARRIER_FREQ_MHZ = 700          # Carrier frequency in MHz
-    BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
     CELL_RADIUS_M = 500             # Radius of the single cell
     NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     

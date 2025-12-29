@@ -99,6 +99,8 @@ class D2DEnvironment:
         sinr_cell_db = 10 * np.log10(sinr_cell_linear)
         
         # Calculate Throughputs (Mbps) using Shannon Capacity (Shannon-Hartley Theorem)
+        # C = B * log2(1 + SINR)
+        # C: Throughput (bps), B: Bandwidth (Hz)
         tput_d2d_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
         tput_cell_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
         

@@ -21,7 +21,6 @@ class SimulationConfig:
 
     # General Network Settings
     CARRIER_FREQ_MHZ = 700          # Carrier frequency in MHz
-    BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
     CELL_RADIUS_M = 500             # Radius of the single cell
     NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     

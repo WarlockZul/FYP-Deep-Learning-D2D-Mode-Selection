@@ -22,13 +22,15 @@ class D2DEnvironmentPaper:
         # Create the D2D Pair (Tx and Rx)
         self.d2d_tx = UserEquipment(device_id="Target_Tx")
         self.d2d_rx = UserEquipment(device_id="Target_Rx")
+
+        # Spawn Rx within D2D_MAX_DIST_M from Tx
+        self.d2d_rx.position = self.d2d_rx._get_random_point_in_cell()
         
-        # Override Rx position to be within max D2D distance from Tx    
-        angle = np.random.uniform(0, 2*np.pi)
-        radius = np.random.uniform(10, PaperConfig.D2D_MAX_DIST_M)
-        rx_pos = self.d2d_tx.position + np.array([radius * np.cos(angle), radius * np.sin(angle)])
-        self.d2d_rx.position = rx_pos 
-        
+        # To ensure Rx is within D2D_MAX_DIST_M from Tx
+        dist = self.d2d_tx.get_distance_to(self.d2d_rx)
+        if dist > PaperConfig.D2D_MAX_DIST_M:
+            pass
+
         # Create interferers (number fixed as per research paper)
         num_interferers = PaperConfig.NUM_INTERFERER
         
@@ -92,6 +94,9 @@ class D2DEnvironmentPaper:
         sinr_cell_db = 10 * np.log10(sinr_cell_linear)
         
         # Calculate Throughputs (Mbps) using Shannon Capacity (shannon-Hartley Theorem)
+        # C = B * log2(1 + SINR)
+        # C: Throughput (Mbps), B: Bandwidth (Hz)
+        # NOTE: Throughput calculated in Mbps, hence division by 1e6
         tput_d2d_mbps = (PaperConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
         tput_cell_mbps = (PaperConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
         
