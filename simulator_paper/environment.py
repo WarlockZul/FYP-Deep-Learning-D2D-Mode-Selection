@@ -1,10 +1,10 @@
 import numpy as np
 from typing import Optional, List
-from simulator.config import SimulationConfig
-from simulator.channel_model import ChannelModel
-from simulator.entities import BaseStation, UserEquipment
+from simulator_paper.config import PaperConfig
+from simulator_paper.channel_model import ChannelModelPaper
+from simulator_paper.entities import BaseStation, UserEquipment
 
-class D2DEnvironment:
+class D2DEnvironmentPaper:
     def __init__(self):
         self.bs = BaseStation()
         self.d2d_tx: Optional[UserEquipment] = None 
@@ -18,30 +18,23 @@ class D2DEnvironment:
     def reset(self):
         # Reset time step for new episode
         self.time_step = 0
-
-        # Randomly choose speed for D2D pair
-        # NOTE: Speed remains constant (pedestrian or moderate) during an episode, changes each episode
-        current_episode_speed = np.random.choice(['pedestrian', 'moderate'])
-        
+ 
         # Create the D2D Pair (Tx and Rx)
-        self.d2d_tx = UserEquipment(device_id="Target_Tx", speed_type=current_episode_speed)
-        self.d2d_rx = UserEquipment(device_id="Target_Rx", speed_type=current_episode_speed)
+        self.d2d_tx = UserEquipment(device_id="Target_Tx")
+        self.d2d_rx = UserEquipment(device_id="Target_Rx")
         
-        # Override Rx position to be within max D2D distance from Tx
+        # Override Rx position to be within max D2D distance from Tx    
         angle = np.random.uniform(0, 2*np.pi)
-        radius = np.random.uniform(10, SimulationConfig.D2D_MAX_DIST_M)
+        radius = np.random.uniform(10, PaperConfig.D2D_MAX_DIST_M)
         rx_pos = self.d2d_tx.position + np.array([radius * np.cos(angle), radius * np.sin(angle)])
         self.d2d_rx.position = rx_pos 
         
-        # Create Interfering Devices with moderate speed (10 to 20 interferers)
-        # NOTE: Number of interferers remain constant during an episode, changes each episode
-        num_interferers = np.random.randint(
-            SimulationConfig.MIN_NUM_INTERFERER, SimulationConfig.MAX_NUM_INTERFERER + 1
-        )
-
-        # Create interferers list and set their speed type same as D2D pair for consistency
+        # Create interferers (number fixed as per research paper)
+        num_interferers = PaperConfig.NUM_INTERFERER
+        
+        # Create interferers list
         self.interferers = [
-            UserEquipment(f"Int_{i}", speed_type=current_episode_speed) 
+            UserEquipment(f"Int_{i}") 
             for i in range(num_interferers)
         ]
         
@@ -54,7 +47,7 @@ class D2DEnvironment:
         # Increment time step
         self.time_step += 1
         
-        # Move for next time step (or 1 second) 
+        # Move for next time step (or 1 second)
         self.d2d_tx.move()
         self.d2d_rx.move()
         for device in self.interferers:
@@ -64,22 +57,22 @@ class D2DEnvironment:
         dist_d2d = self.d2d_tx.get_distance_to(self.d2d_rx)
         dist_cellular = self.bs.get_distance_to(self.d2d_rx)
         
-        # Calculate Received Signal Powers (Watts) 
-        s_d2d_watts = ChannelModel.compute_received_power(
+        # Calculate received signal powers (Watts)
+        s_d2d_watts = ChannelModelPaper.compute_received_power(
             self.d2d_tx.tx_power_dbm, dist_d2d, is_d2d=True
         )
-        s_cellular_watts = ChannelModel.compute_received_power(
+        s_cellular_watts = ChannelModelPaper.compute_received_power(
             self.bs.tx_power_dbm, dist_cellular, is_d2d=False
         )
         
         # Calculate total interference power from all interferers (Watts)
         total_interference_watts = 0.0
-        rho = SimulationConfig.INTERFERENCE_LOAD_FACTOR
+        rho = PaperConfig.INTERFERENCE_LOAD_FACTOR
         for interferer in self.interferers:
             dist_int_to_rx = interferer.get_distance_to(self.d2d_rx)
             
             # Raw received power from interferer (P_k * G_kj)
-            raw_interference_watts = ChannelModel.compute_received_power(
+            raw_interference_watts = ChannelModelPaper.compute_received_power(
                 interferer.tx_power_dbm, dist_int_to_rx, is_d2d=True
             )
             
@@ -89,7 +82,7 @@ class D2DEnvironment:
             
         # Calculate Noise Power (Watts) (Sigma^2)
         # NOTE: [Refer to research paper]
-        noise_watts = SimulationConfig.get_noise_power_watts()
+        noise_watts = PaperConfig.get_noise_power_watts()
         
         # Calculate SINR in linear scale and then convert to dB
         # SINR = S / (I + N)
@@ -98,9 +91,9 @@ class D2DEnvironment:
         sinr_cell_linear = s_cellular_watts / (total_interference_watts + noise_watts)
         sinr_cell_db = 10 * np.log10(sinr_cell_linear)
         
-        # Calculate Throughputs (Mbps) using Shannon Capacity (Shannon-Hartley Theorem)
-        tput_d2d_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
-        tput_cell_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
+        # Calculate Throughputs (Mbps) using Shannon Capacity (shannon-Hartley Theorem)
+        tput_d2d_mbps = (PaperConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
+        tput_cell_mbps = (PaperConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
         
         # Choose Optimal Mode based on Higher Throughput for this time step
         optimal_mode = "D2D" if tput_d2d_mbps >= tput_cell_mbps else "Cellular"
@@ -108,44 +101,34 @@ class D2DEnvironment:
         # Create state list/dictionary to return
         state = {
             "timestamp": self.time_step,
-            "episode_id": getattr(self, 'episode_id', 0), # Safe fallback if not set
+            "episode_id": getattr(self, 'episode_id', 0),
             
-            # Positions
             "tx_pos_x": self.d2d_tx.position[0],
             "tx_pos_y": self.d2d_tx.position[1],
             "rx_pos_x": self.d2d_rx.position[0],
             "rx_pos_y": self.d2d_rx.position[1],
             
-            # Distances
             "distance_tx_rx": dist_d2d,
             "distance_bs_rx": dist_cellular,
 
-            # Speeds (m/s)
             "tx_speed_mps": self.d2d_tx.speed,
             "rx_speed_mps": self.d2d_rx.speed,
             
-            # Transmit Powers (dBm)
             "tx_power_d2d_dbm": self.d2d_tx.tx_power_dbm,
             "tx_power_bs_dbm": self.bs.tx_power_dbm,
             
-            # Received Signal Powers (dBm)
-            # Convert Watts to dBm: 10*log10(P*1000)
             "rx_power_d2d_dbm": 10 * np.log10(s_d2d_watts * 1000),
             "rx_power_cell_dbm": 10 * np.log10(s_cellular_watts * 1000),
             
-            # Interference & Noise 
             "interference_dbm": 10 * np.log10(total_interference_watts * 1000),
             "noise_dbm": 10 * np.log10(noise_watts * 1000),
             
-            # SINR
             "sinr_d2d_db": sinr_d2d_db,
             "sinr_cell_db": sinr_cell_db,
             
-            # Throughput
             "throughput_d2d_mbps": tput_d2d_mbps,
             "throughput_cell_mbps": tput_cell_mbps,
             
-            # Label
             "optimal_mode": optimal_mode
         }
         

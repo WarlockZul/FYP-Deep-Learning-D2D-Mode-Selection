@@ -1,19 +1,17 @@
 import numpy as np
 
-class SimulationConfig:
+class PaperConfig:
     # Simulation Settings 
     NUM_EPISODES = 50               # How many separate 100-second runs to do
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
     D2D_MAX_DIST_M = 50             # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
-    OUTPUT_FILE = "data/simulation_data.csv"
+    OUTPUT_FILE = "data/test_simulation_data.csv"
     
     # Mobility Settings
     PROBABILITY_START_MOVING = 0.10 # Probability that a UE starts moving in a time step
 
     # Channel Model Settings
-    USE_RANDOM_SHADOWING = False    # Set to True to use range (4-8), False for fixed (6)
-    USE_RAYLEIGH_FADING = True      # Toggle fast fading True: on, False: off
     INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
     BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
 
@@ -43,31 +41,24 @@ class SimulationConfig:
     PATH_LOSS_D2D_B_FREQ = 20       # Factor for frequency log
     PATH_LOSS_D2D_C_DIST = 20       # Factor for distance log
     
-    # Shadowing and Fading Parameters
-    SHADOWING_SIGMA_DB = 6          # Fixed value (Average Urban)
-    SHADOWING_SIGMA_MIN = 4         # Minimum spread (Cleaner env)
-    SHADOWING_SIGMA_MAX = 8         # Maximum spread (Dense Urban)
-    
     # Mobility & Environment Settings
     TIME_STEP_S = 1                 # Delta t = 1s
-    MIN_NUM_INTERFERER = 10         # Min number of interferers per time step
-    MAX_NUM_INTERFERER = 20         # Max number of interferers per time step
+    NUM_INTERFERER = 20             # Max number of interferers per time step
     
     # Speed ranges (m/s)
-    SPEED_MIN = 1                   # Pedestrian
-    SPEED_MAX = 10                  # Moderate mobility
+    SPEED = 3                       # Constant mobility
 
     # Helper to convert Noise dBm to Watts
     @staticmethod
     def get_noise_power_watts():
-        return 10 ** ((SimulationConfig.NOISE_POWER_DBM - 30) / 10)
+        return 10 ** ((PaperConfig.NOISE_POWER_DBM - 30) / 10)
 
     # Helper to convert BS dBm to Watts
     @staticmethod
     def get_bs_power_watts():
-        return 10 ** ((SimulationConfig.TX_POWER_BS_DBM - 30) / 10)
+        return 10 ** ((PaperConfig.TX_POWER_BS_DBM - 30) / 10)
 
     # Helper to convert D2D Tx dBm to Watts
     @staticmethod
     def get_d2d_power_watts():
-        return 10 ** ((SimulationConfig.TX_POWER_D2D_DBM - 30) / 10)
+        return 10 ** ((PaperConfig.TX_POWER_D2D_DBM - 30) / 10)

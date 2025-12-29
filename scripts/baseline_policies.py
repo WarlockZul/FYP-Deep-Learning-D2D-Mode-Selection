@@ -5,14 +5,13 @@ import sys
 
 # Read in project root for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from simulator.config import SimulationConfig
 
-# Load the dataset generated in Step 3
-def load_data():
-    """Loads the dataset generated in Step 3."""
-    file_path = SimulationConfig.OUTPUT_FILE
+# Load the dataset based on the provided configuration
+# Use 'config' argument to choose between different configurations
+def load_data(config):
+    file_path = config.OUTPUT_FILE
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Data file not found at {file_path}. Please run 'generate_data.py' first.")
+        raise FileNotFoundError(f"Data file not found at {file_path}. Please run the appropriate simulation first.")
     
     print(f"Loading data from {file_path}...")
     df = pd.read_csv(file_path)
@@ -45,7 +44,7 @@ def policy_ground_truth(df):
     return df['optimal_mode']
 
 # Function to calculate evaluation metrics
-def calculate_metrics(df, mode_decisions, policy_name):
+def calculate_metrics(df, mode_decisions, policy_name, config):
     # 1. Calculate Average Throughput
     # Select throughput based on mode selected
     final_throughput = np.where(
@@ -68,11 +67,11 @@ def calculate_metrics(df, mode_decisions, policy_name):
 
     switches = (df_temp['decision'] != df_temp['prev_decision'])
     total_switches = switches.sum()
-    total_time_seconds = len(df) * SimulationConfig.TIME_STEP_S
+    total_time_seconds = len(df) * config.TIME_STEP_S
     switch_rate = (total_switches / total_time_seconds) * 100 
 
     # 3. Calculate Average Spectral Efficiency (bps/Hz) [bps, not Mbps]
-    avg_spectral_efficiency = (avg_throughput * 1e6) / SimulationConfig.BANDWIDTH_HZ
+    avg_spectral_efficiency = (avg_throughput * 1e6) / config.BANDWIDTH_HZ
 
     # 4. Calculate Average D2D Residence Time
     # Logic: Identify blocks of "D2D", calculate their lengths, and average them.
@@ -95,7 +94,7 @@ def calculate_metrics(df, mode_decisions, policy_name):
         
         d2d_only = df_temp[df_temp['decision'] == "D2D"]
         block_lengths = d2d_only.groupby('block_id').size()
-        block_durations = block_lengths * SimulationConfig.TIME_STEP_S
+        block_durations = block_lengths * config.TIME_STEP_S
         avg_residence_time = block_durations.mean()
     
     return {

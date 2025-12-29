@@ -1,24 +1,24 @@
 import numpy as np
-from simulator.config import SimulationConfig
+from simulator_paper.config import PaperConfig
 
 # Represents the cellular Base Station (BS).
 class BaseStation:
     # Located at the center (0,0) of the cell.
     def __init__(self):
         self.position = np.array([0.0, 0.0])
-        self.tx_power_dbm = SimulationConfig.TX_POWER_BS_DBM
+        self.tx_power_dbm = PaperConfig.TX_POWER_BS_DBM
 
     # Calculates Euclidean distance to another entity (UE)
     def get_distance_to(self, other_entity):
         return np.linalg.norm(self.position - other_entity.position)
 
-# Represents a mobile device, or user equipement (UE).
+# Represents a mobile device (UE) in the Paper Environment.
 class UserEquipment:
-    def __init__(self, device_id, speed_type='mixed'):
+    def __init__(self, device_id):
         # Initialize Device ID
         self.device_id = device_id
         
-        # Initialize Start Position
+        # Initialize Start Position (Uniform distribution in cell)
         self.position = self._get_random_point_in_cell()
         
         # Initialize Random Waypoint Destination
@@ -27,25 +27,17 @@ class UserEquipment:
         # Initialize State Flag: True = Paused, False = Moving
         self.is_paused = False
         
-        # Initialize Speed: Pedestrian (1-3 ms), Vehicle (3-10 ms), or Mixed (1-10 ms)
-        #
-        # WARNING: Fix the speed type to pedestrian or vehicle only, remove mixed
-        # WARNING: Change speed_type argument for class UE
-        #
-        if speed_type == 'pedestrian':
-            self.speed = np.random.uniform(1, 3)
-        elif speed_type == 'vehicle':
-            self.speed = np.random.uniform(3, 10)
-        else:
-            self.speed = np.random.uniform(SimulationConfig.SPEED_MIN, SimulationConfig.SPEED_MAX)
+        # Initialize Speed: 
+        # NOTE: Speed is fixed as per research paper 
+        self.speed = PaperConfig.SPEED
             
         # Initialize Transmit Power
-        self.tx_power_dbm = SimulationConfig.TX_POWER_D2D_DBM
+        self.tx_power_dbm = PaperConfig.TX_POWER_D2D_DBM
         
     # Picks a new random point within the cell
     def _get_random_point_in_cell(self):
         # r = R * sqrt(random) ensures uniform distribution in a circle
-        radius = SimulationConfig.CELL_RADIUS_M * np.sqrt(np.random.rand())
+        radius = PaperConfig.CELL_RADIUS_M * np.sqrt(np.random.rand())
         angle = 2 * np.pi * np.random.rand()
         return np.array([radius * np.cos(angle), radius * np.sin(angle)])
 
@@ -53,8 +45,8 @@ class UserEquipment:
     def move(self):
         # --- CASE 1: PAUSED ---
         if self.is_paused:
-            # Check probability to start moving
-            if np.random.rand() < SimulationConfig.PROBABILITY_START_MOVING:
+            # Check probability to start moving (0.10 in your config)
+            if np.random.rand() < PaperConfig.PROBABILITY_START_MOVING:
                 # Start moving to a new random destination
                 self.is_paused = False
                 self.destination = self._get_random_point_in_cell()
@@ -63,7 +55,7 @@ class UserEquipment:
                 return 
 
         # --- CASE 2: MOVING ---
-        dt = SimulationConfig.TIME_STEP_S
+        dt = PaperConfig.TIME_STEP_S
         
         # Calculate direction vector to destination
         direction_vector = self.destination - self.position
