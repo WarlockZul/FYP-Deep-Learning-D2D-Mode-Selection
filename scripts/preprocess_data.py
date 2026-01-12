@@ -55,8 +55,9 @@ def preprocess_data():
     print(f"Feature List: {features}")
     
     # Prepare labels (Y)
-    target = 'optimal_mode'
-    df['label'] = df[target].apply(lambda x: 1 if x == 'D2D' else 0)
+    print("Creating Regression Targets (Next Step SINR)...")
+    df['label'] = df.groupby('episode_id')['sinr_d2d_db'].shift(-1)
+    df = df.dropna(subset=['label'])
     
     # NOTE: Save intermediate CSV to check it in Excel
     debug_path = "data/processed_debug.csv"
