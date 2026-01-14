@@ -14,32 +14,27 @@ class BaseStation:
 
 # Represents a mobile device, or user equipement (UE).
 class UserEquipment:
-    def __init__(self, device_id, speed_type='mixed'):
-        # Initialize Device ID
-        self.device_id = device_id
-        
-        # Initialize Start Position
-        self.position = self._get_random_point_in_cell()
-        
-        # Initialize Random Waypoint Destination
-        self.destination = self._get_random_point_in_cell()
-
-        # Initialize State Flag: True = Paused, False = Moving
-        self.is_paused = False
-        
-        # Initialize Speed: Pedestrian (1-3 ms), Vehicle (3-10 ms), or Mixed (1-10 ms)
-        #
-        # WARNING: Fix the speed type to pedestrian or vehicle only, remove mixed
-        # WARNING: Change speed_type argument for class UE
-        #
+    def __init__(self, device_id, speed_type='pedestrian'):
+        # Initialize Speed: Pedestrian (1-3 ms) or Moderate (3-10 ms)
         if speed_type == 'pedestrian':
-            self.speed = np.random.uniform(1, 3)
-        elif speed_type == 'vehicle':
-            self.speed = np.random.uniform(3, 10)
+            speed_range = SimulationConfig.SPEED_MODE_PEDESTRIAN 
+        elif speed_type == 'moderate':
+            speed_range = SimulationConfig.SPEED_MODE_MODERATE 
         else:
-            self.speed = np.random.uniform(SimulationConfig.SPEED_MIN, SimulationConfig.SPEED_MAX)
-            
-        # Initialize Transmit Power
+            raise ValueError(f"Invalid speed_type '{speed_type}'. Must be 'pedestrian' or 'moderate'.")
+        
+        # Initialize the following:
+        # - Device ID
+        # - Start Position
+        # - Random Waypoint Destination
+        # - State Flag: True = Paused, False = Moving
+        # - Speed (m/s)
+        # - Transmit Power (dBm)
+        self.device_id = device_id
+        self.position = self._get_random_point_in_cell()
+        self.destination = self._get_random_point_in_cell()
+        self.is_paused = False
+        self.speed = np.random.uniform(speed_range[0], speed_range[1])
         self.tx_power_dbm = SimulationConfig.TX_POWER_D2D_DBM
         
     # Picks a new random point within the cell
@@ -64,14 +59,13 @@ class UserEquipment:
 
         # --- CASE 2: MOVING ---
         dt = SimulationConfig.TIME_STEP_S
-        
-        # Calculate direction vector to destination
-        direction_vector = self.destination - self.position
 
-        # Calculate distance to destination
+        # Calculate the following:
+        # - Direction vector to destination
+        # - Distance to destination
+        # - Step distance for this time step
+        direction_vector = self.destination - self.position
         distance_to_dest = np.linalg.norm(direction_vector)
-        
-        # Calculate step distance
         step_distance = self.speed * dt
         
         # Check if we reach the destination or overshoot
@@ -81,7 +75,6 @@ class UserEquipment:
 
             # Transition to PAUSE state/stop moving
             self.is_paused = True
-            
         else:
             # Continue moving towards destination
             unit_vector = direction_vector / distance_to_dest

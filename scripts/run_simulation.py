@@ -23,7 +23,9 @@ def generate_dataset():
     # Loop through episodes
     for episode in tqdm(range(SimulationConfig.NUM_EPISODES), desc="Simulating Episodes"):
         # Reset environment for new episode (new positions, new shadowing)
-        env.reset()
+        initial_state = env.reset()
+        initial_state['episode_id'] = episode
+        all_records.append(initial_state)
         
         # Loop through time steps in the episode
         for step in range(SimulationConfig.STEPS_PER_EPISODE):

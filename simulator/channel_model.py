@@ -35,24 +35,14 @@ class ChannelModel:
     # Helper to return shadowing value in dB
     @staticmethod
     def get_shadowing():
-        if SimulationConfig.USE_RANDOM_SHADOWING:
-            # Pick a random Sigma uniformly between 4 and 8
-            sigma = np.random.uniform(
-                SimulationConfig.SHADOWING_SIGMA_MIN, 
-                SimulationConfig.SHADOWING_SIGMA_MAX
-            )
-        else:
-            # Use the fixed Sigma (e.g., 6)
-            sigma = SimulationConfig.SHADOWING_SIGMA_DB
-
-        # np.random.randn() gives standard normal (mean 0, var 1)
+        sigma = SimulationConfig.SHADOWING_SIGMA_DB
         return sigma * np.random.randn()
 
     # Helper to return the power gain from Rayleigh Fading (Linear scale, not dB).
     @staticmethod
     def get_rayleigh_fading_gain():
         # Rayleigh fading implies the magnitude is Rayleigh distributed.
-        # The power (magnitude^2) is Exponentially distributed with mean 1.
+        # The power (magnitude^2) is exponentially distributed with mean 1.
         if not SimulationConfig.USE_RAYLEIGH_FADING:
             return 1.0
         

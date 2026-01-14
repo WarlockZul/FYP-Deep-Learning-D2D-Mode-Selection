@@ -11,11 +11,15 @@ class D2DEnvironment:
         self.d2d_rx: Optional[UserEquipment] = None
         self.interferers: list[UserEquipment] = []
         self.time_step = 0
+        self.episode_id = 0
         
         # Initialize the environment immediately
         self.reset()
         
     def reset(self):
+        # Increment episode ID for tracking
+        self.episode_id += 1
+        
         # Reset time step for new episode
         self.time_step = 0
 
@@ -60,6 +64,17 @@ class D2DEnvironment:
         for device in self.interferers:
             device.move()
             
+        # Return the new state
+        return self._compute_physics_state()
+
+    def get_state(self):
+        # Return the current state (used for t=0 reset)
+        return self._compute_physics_state()
+
+    def _compute_physics_state(self):
+        assert self.d2d_tx is not None
+        assert self.d2d_rx is not None
+
         # Calculate distances between entities (D2D: Tx to Rx, Cellular: BS to Rx)
         dist_d2d = self.d2d_tx.get_distance_to(self.d2d_rx)
         dist_cellular = self.bs.get_distance_to(self.d2d_rx)
@@ -83,34 +98,30 @@ class D2DEnvironment:
                 interferer.tx_power_dbm, dist_int_to_rx, is_d2d=True
             )
             
-            # Apply Load Factor (Rho): sum(rho_k * P_k * G_kj) 
-            # NOTE: [Refer to research paper]
+            # Apply Load Factor (Rho)
             total_interference_watts += (rho * raw_interference_watts)
             
-        # Calculate Noise Power (Watts) (Sigma^2)
-        # NOTE: [Refer to research paper]
+        # Calculate Noise Power (Watts)
         noise_watts = SimulationConfig.get_noise_power_watts()
         
-        # Calculate SINR in linear scale and then convert to dB
+        # Calculate SINR
         # SINR = S / (I + N)
         sinr_d2d_linear = s_d2d_watts / (total_interference_watts + noise_watts)
         sinr_d2d_db = 10 * np.log10(sinr_d2d_linear)
         sinr_cell_linear = s_cellular_watts / (total_interference_watts + noise_watts)
         sinr_cell_db = 10 * np.log10(sinr_cell_linear)
         
-        # Calculate Throughputs (Mbps) using Shannon Capacity (Shannon-Hartley Theorem)
-        # C = B * log2(1 + SINR)
-        # C: Throughput (bps), B: Bandwidth (Hz)
+        # Calculate Throughputs (Mbps)
         tput_d2d_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
         tput_cell_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
         
-        # Choose Optimal Mode based on Higher Throughput for this time step
+        # Choose Optimal Mode
         optimal_mode = "D2D" if tput_d2d_mbps >= tput_cell_mbps else "Cellular"
         
-        # Create state list/dictionary to return
+        # Create state dictionary
         state = {
             "timestamp": self.time_step,
-            "episode_id": getattr(self, 'episode_id', 0), # Safe fallback if not set
+            "episode_id": self.episode_id,
             
             # Positions
             "tx_pos_x": self.d2d_tx.position[0],
@@ -131,12 +142,11 @@ class D2DEnvironment:
             "tx_power_bs_dbm": self.bs.tx_power_dbm,
             
             # Received Signal Powers (dBm)
-            # Convert Watts to dBm: 10*log10(P*1000)
             "rx_power_d2d_dbm": 10 * np.log10(s_d2d_watts * 1000),
             "rx_power_cell_dbm": 10 * np.log10(s_cellular_watts * 1000),
             
             # Interference & Noise 
-            "interference_dbm": 10 * np.log10(total_interference_watts * 1000),
+            "interference_dbm": 10 * np.log10(total_interference_watts * 1000) if total_interference_watts > 0 else -174,
             "noise_dbm": 10 * np.log10(noise_watts * 1000),
             
             # SINR
@@ -152,6 +162,3 @@ class D2DEnvironment:
         }
         
         return state
-
-    def get_state(self):
-        pass

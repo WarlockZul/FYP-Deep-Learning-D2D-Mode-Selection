@@ -4,7 +4,7 @@ class SimulationConfig:
     # Simulation Settings 
     NUM_EPISODES = 100              # How many separate runs to do
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
-    D2D_MAX_DIST_M = 50             # Maximum distance to consider D2D pairing feasible
+    D2D_MAX_DIST_M = 250            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
     OUTPUT_FILE = "data/simulation_data.csv"
     
@@ -12,7 +12,6 @@ class SimulationConfig:
     PROBABILITY_START_MOVING = 0.10 # Probability that a UE starts moving in a time step
 
     # Channel Model Settings
-    USE_RANDOM_SHADOWING = False    # Set to True to use range (4-8), False for fixed (6)
     USE_RAYLEIGH_FADING = True      # Toggle fast fading True: on, False: off
     INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
     BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
@@ -43,9 +42,7 @@ class SimulationConfig:
     PATH_LOSS_D2D_C_DIST = 20       # Factor for distance log
     
     # Shadowing and Fading Parameters
-    SHADOWING_SIGMA_DB = 6          # Fixed value (Average Urban)
-    SHADOWING_SIGMA_MIN = 4         # Minimum spread (Cleaner env)
-    SHADOWING_SIGMA_MAX = 8         # Maximum spread (Dense Urban)
+    SHADOWING_SIGMA_DB = 6          # Fixed sigma (Average of 4-8)
     
     # Mobility & Environment Settings
     TIME_STEP_S = 1                 # Delta t = 1s
@@ -53,8 +50,11 @@ class SimulationConfig:
     MAX_NUM_INTERFERER = 20         # Max number of interferers per time step
     
     # Speed ranges (m/s)
-    SPEED_MIN = 1                   # Pedestrian
-    SPEED_MAX = 10                  # Moderate mobility
+    SPEED_MODE_PEDESTRIAN = (1, 3)  # Range: 1 to 3 m/s 
+    SPEED_MODE_MODERATE = (3, 10)   # Range: 3 to 10 m/s
+
+    # Probability of an episode being "Pedestrian" type vs "Moderate" type
+    PROB_PEDESTRIAN_EPISODE = 0.5
 
     # Helper to convert Noise dBm to Watts
     @staticmethod
