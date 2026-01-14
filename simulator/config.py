@@ -14,7 +14,8 @@ class SimulationConfig:
     # Channel Model Settings
     USE_RAYLEIGH_FADING = True      # Toggle fast fading True: on, False: off
     INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
-    BANDWIDTH_HZ = 10e6             # System Bandwidth (10 MHz is standard for LTE)
+    BANDWIDTH_HZ = 100e6            # System Bandwidth
+    HANDOVER_LATENCY_S = 0.050      # Handover latency in seconds (50 ms)
 
     #####################################################################################################
 

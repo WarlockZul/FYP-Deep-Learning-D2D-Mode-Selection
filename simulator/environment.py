@@ -12,6 +12,7 @@ class D2DEnvironment:
         self.interferers: list[UserEquipment] = []
         self.time_step = 0
         self.episode_id = 0
+        self.last_optimal_mode = None
         
         # Initialize the environment immediately
         self.reset()
@@ -22,6 +23,9 @@ class D2DEnvironment:
         
         # Reset time step for new episode
         self.time_step = 0
+
+        # Reset last optimal mode
+        self.last_optimal_mode = None
 
         # Randomly choose speed for D2D pair
         # NOTE: Speed remains constant (pedestrian or moderate) during an episode, changes each episode
@@ -114,9 +118,31 @@ class D2DEnvironment:
         # Calculate Throughputs (Mbps)
         tput_d2d_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_d2d_linear)) / 1e6
         tput_cell_mbps = (SimulationConfig.BANDWIDTH_HZ * np.log2(1 + sinr_cell_linear)) / 1e6
+
+        # Get Latency (Fallback to 0.05s if not in config)
+        # NOTE: Not in proposal or research paper, but added for realism in switching cost
+        latency = SimulationConfig.HANDOVER_LATENCY_S
+        penalty_factor = 1.0 - latency
         
-        # Choose Optimal Mode
-        optimal_mode = "D2D" if tput_d2d_mbps >= tput_cell_mbps else "Cellular"
+        # Determine Optimal Mode with Handover Cost Consideration
+        # T=0: No switching cost
+        if self.last_optimal_mode is None:
+            optimal_mode = "D2D" if tput_d2d_mbps >= tput_cell_mbps else "Cellular"
+        # T>0: Consider switching cost
+        else:
+            # Staying in D2D costs nothing. Switching to Cell costs penalty.
+            if self.last_optimal_mode == "D2D":
+                payoff_stay = tput_d2d_mbps
+                payoff_switch = tput_cell_mbps * penalty_factor
+                optimal_mode = "D2D" if payoff_stay >= payoff_switch else "Cellular"
+            # Staying in Cell costs nothing. Switching to D2D costs penalty.
+            else:
+                payoff_stay = tput_cell_mbps
+                payoff_switch = tput_d2d_mbps * penalty_factor
+                optimal_mode = "Cellular" if payoff_stay >= payoff_switch else "D2D"
+
+        # Update history
+        self.last_optimal_mode = optimal_mode
         
         # Create state dictionary
         state = {

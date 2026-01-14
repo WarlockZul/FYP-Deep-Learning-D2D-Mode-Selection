@@ -45,48 +45,51 @@ def policy_ground_truth(df):
 
 # Function to calculate evaluation metrics
 def calculate_metrics(df, mode_decisions, policy_name, config):
-    # 1. Calculate Average Throughput
-    # Select throughput based on mode selected
-    final_throughput = np.where(
-        mode_decisions == "D2D", 
-        df['throughput_d2d_mbps'], 
-        df['throughput_cell_mbps']
-    )
-
-    avg_throughput = np.mean(final_throughput)
-    
-    # 2. Calculate Switching Rate
-    # NOTE: Switching only counts within the same episode
-    # A switch happens if Mode(t) != Mode(t-1)
-    # - Step 1: Create a temporary DataFrame to track previous decisions
-    # - Step 2: Use groupby on episode_id to ensure switches are only counted within episodes
-    # - Step 3: Calculate total switches and total time to get switching rate
+    # Create a temp dataframe to handle logic safely
     df_temp = df.copy()
     df_temp['decision'] = mode_decisions
-    df_temp['prev_decision'] = df_temp.groupby('episode_id')['decision'].shift(1).fillna(df_temp['decision'])
-
-    switches = (df_temp['decision'] != df_temp['prev_decision'])
-    total_switches = switches.sum()
+    
+    # 1. Detect Switching
+    # We must group by episode_id so we don't penalize the first step of a new episode
+    df_temp['prev_decision'] = df_temp.groupby('episode_id')['decision'].shift(1)
+    
+    # A switch happens if Current != Prev AND Prev is not NaN (Start of episode)
+    df_temp['is_switch'] = (df_temp['decision'] != df_temp['prev_decision']) & (df_temp['prev_decision'].notna())
+    
+    # 2. Get Raw Throughput
+    df_temp['raw_throughput'] = np.where(
+        df_temp['decision'] == "D2D", 
+        df_temp['throughput_d2d_mbps'], 
+        df_temp['throughput_cell_mbps']
+    )
+    
+    # 3. Apply Handover Latency Penalty
+    # Get latency from config (default to 0.05 if missing)
+    latency = getattr(config, 'HANDOVER_LATENCY_S', 0.05)
+    
+    # Efficiency Factor: 1.0 (100%) if no switch, (1.0 - Latency) if switch
+    # Example: 1.0 - 0.05 = 0.95 (95% efficiency)
+    df_temp['efficiency'] = np.where(df_temp['is_switch'], 1.0 - latency, 1.0)
+    
+    # Calculate Effective Throughput
+    df_temp['effective_throughput'] = df_temp['raw_throughput'] * df_temp['efficiency']
+    
+    avg_throughput = df_temp['effective_throughput'].mean()
+    
+    # 4. Calculate Switching Rate
+    total_switches = df_temp['is_switch'].sum()
     total_time_seconds = len(df) * config.TIME_STEP_S
     switch_rate = (total_switches / total_time_seconds) * 100 
 
-    # 3. Calculate Average Spectral Efficiency (bps/Hz) [bps, not Mbps]
+    # 5. Calculate Spectral Efficiency
     avg_spectral_efficiency = (avg_throughput * 1e6) / config.BANDWIDTH_HZ
 
-    # 4. Calculate Average D2D Residence Time
-    # Logic: Identify blocks of "D2D", calculate their lengths, and average them.
-    # - Filter only rows where decision is D2D
-    # - If not D2D blocks, avg residence time is 0
-    # - Else, find contiguous blocks of D2D and calculate their lengths
-    # - Step 1: Store blocks by detecting changes in decision & new episodes
-    # - Step 2: Exclude non-D2D blocks (cellular)
-    # - Step 3: Calculate lengths of D2D blocks
-    # - Step 4: Multiply lengths by time step to get durations in seconds
-    # - Step 5: Average the durations to get final avg residence time
-    d2d_blocks = (mode_decisions == "D2D").astype(int)
+    # 6. Calculate Average D2D Residence Time
+    d2d_blocks = (df_temp['decision'] == "D2D").astype(int)
     if d2d_blocks.sum() == 0:
         avg_residence_time = 0.0
     else:
+        # Create block IDs
         df_temp['block_id'] = (
             (df_temp['decision'] != df_temp['prev_decision']) | 
             (df_temp['episode_id'] != df_temp['episode_id'].shift(1))
