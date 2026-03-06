@@ -32,7 +32,8 @@ def perform_error_analysis():
     # --- Step 8.2: Fit Gaussian KDE (For Visualization) ---
     print("\n--- Step 8.2: Fit Gaussian KDE ---")
     # We use the KDE for the SHAPE (the blue curve), but not for the BOUNDS.
-    kde = gaussian_kde(residuals, bw_method='scott') 
+    bw_method = 0.5  
+    kde = gaussian_kde(residuals, bw_method=bw_method) 
     
     x_grid = np.linspace(min(residuals) - 1.0, max(residuals) + 1.0, 2000)
     pdf_values = kde(x_grid)
@@ -51,7 +52,8 @@ def perform_error_analysis():
     error_params = {
         'lower_bound': lower_bound,
         'upper_bound': upper_bound,
-        'kde_model': kde
+        'residuals_data': residuals,
+        'bandwidth': bw_method
     }
     os.makedirs("models", exist_ok=True)
     with open("models/error_params_kde.pkl", "wb") as f:

@@ -72,7 +72,7 @@ class ChannelModel:
         
         # Apply Small-scale Rayleigh Fading (Linear multiplication)
         # Transmission Power x Channel Gain (P_i x G_ij)
-        fading_gain = ChannelModel.get_rayleigh_fading_gain()
-        final_rx_power_watts = rx_power_watts * fading_gain
+        channel_gain = ChannelModel.get_rayleigh_fading_gain()
+        final_rx_power_watts = rx_power_watts * channel_gain
         
         return final_rx_power_watts

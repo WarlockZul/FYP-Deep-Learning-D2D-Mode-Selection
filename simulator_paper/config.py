@@ -14,6 +14,7 @@ class PaperConfig:
     # Channel Model Settings
     INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
     BANDWIDTH_HZ = 100e6            # System Bandwidth
+    NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     HANDOVER_LATENCY_S = 0.050      # Handover latency in seconds (50 ms)
 
     #####################################################################################################
@@ -21,7 +22,6 @@ class PaperConfig:
     # General Network Settings
     CARRIER_FREQ_MHZ = 700          # Carrier frequency in MHz
     CELL_RADIUS_M = 500             # Radius of the single cell
-    NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     
     # Transmitter Power Settings (in dBm) 
     TX_POWER_BS_DBM = 46            # Base Station Transmit Power
