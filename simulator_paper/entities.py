@@ -78,6 +78,12 @@ class UserEquipment:
             # Continue moving towards destination
             unit_vector = direction_vector / distance_to_dest
             self.position = self.position + (unit_vector * step_distance)
+            
+            # If the step somehow pushes the UE outside the cell radius, clamp it to the edge
+            dist_from_center = np.linalg.norm(self.position)
+            if dist_from_center > PaperConfig.CELL_RADIUS_M:
+                # Scale the position vector back so its length is exactly the cell radius
+                self.position = (self.position / dist_from_center) * PaperConfig.CELL_RADIUS_M
 
     # Calculates Euclidean distance to another entity (BS or UE)
     def get_distance_to(self, other_entity):
