@@ -6,7 +6,7 @@ from scipy.stats import gaussian_kde
 import pickle
 
 def load_validation_data():
-    base_path = "data/processed"
+    base_path = "data/model_ready"
     X_val = np.load(os.path.join(base_path, "X_val.npy"))
     y_val = np.load(os.path.join(base_path, "y_val.npy"))
     return X_val, y_val
@@ -15,7 +15,7 @@ def perform_error_analysis():
     print("Loading Validation Data & Model...")
     X_val, y_val = load_validation_data()
     
-    model_path = "models/gru_model.keras"
+    model_path = "models/gru/gru_model.keras"
     if not os.path.exists(model_path):
         raise FileNotFoundError("Model not found. Run 'train_gru.py' first.")
     model = tf.keras.models.load_model(model_path) # type: ignore
@@ -41,7 +41,7 @@ def perform_error_analysis():
     # --- Step 8.3: Derive Confidence Intervals (Using Raw Data) ---
     print("\n--- Step 8.3: Derive 95% Confidence Intervals ---")
     
-    # REVERTED TO EMPIRICAL PERCENTILE (More Accurate/Tighter)
+    # NOTE: REVERTED TO EMPIRICAL PERCENTILE (More Accurate/Tighter)
     # We want the actual 2.5% and 97.5% cutoffs of the real data.
     lower_bound = np.percentile(residuals, 2.5)
     upper_bound = np.percentile(residuals, 97.5)
@@ -55,10 +55,11 @@ def perform_error_analysis():
         'residuals_data': residuals,
         'bandwidth': bw_method
     }
-    os.makedirs("models", exist_ok=True)
-    with open("models/error_params_kde.pkl", "wb") as f:
+    os.makedirs("models/gru", exist_ok=True)
+    save_path = "models/gru/gru_error_params_kde.pkl"
+    with open(save_path, "wb") as f:
         pickle.dump(error_params, f)
-    print("Error parameters saved to 'models/error_params_kde.pkl'")
+    print(f"Error parameters saved to '{save_path}'")
 
     # ==========================================
     # FIGURE 1: THE ORIGINAL HISTOGRAM (Result)

@@ -1,10 +1,14 @@
+import sys
 import pandas as pd
 import os
+
+# Add the project root to the python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
 from baseline_policies import (
     load_data, policy_always_d2d, policy_always_cellular, 
     policy_random, policy_sinr_threshold, policy_ground_truth, calculate_metrics
 )
-
 from simulator.config import SimulationConfig
 from simulator_paper.config import PaperConfig
 
@@ -16,11 +20,11 @@ def main():
     if ENV_MODE == "PAPER":
         print(">>> RUNNING BASELINES FOR: PAPER REPLICATION ENVIRONMENT")
         selected_config = PaperConfig
-        output_csv_name = "data/baseline_results_paper.csv"
+        output_csv_name = "data/results/baseline_results_paper.csv"
     else:
         print(">>> RUNNING BASELINES FOR: PROPOSED SIMULATION ENVIRONMENT")
         selected_config = SimulationConfig
-        output_csv_name = "data/baseline_results_proposed.csv"
+        output_csv_name = "data/results/baseline_results_proposed.csv"
     
     # Load Data
     try:

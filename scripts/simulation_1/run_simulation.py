@@ -5,28 +5,30 @@ import numpy as np
 from tqdm import tqdm
 
 # Add the project root to the python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from simulator_paper.environment import D2DEnvironmentPaper
-from simulator_paper.config import PaperConfig
+from simulator.environment import D2DEnvironment
+from simulator.config import SimulationConfig
 
-def generate_paper_dataset():
+def generate_dataset():
     # Set random seed for reproducibility (meaning same outputs on each run, unless changed)
-    np.random.seed(PaperConfig.SEED)
-    print(f"Random Seed set to: {PaperConfig.SEED}")
-    print(f"Starting PAPER Simulation: {PaperConfig.NUM_EPISODES} episodes, {PaperConfig.STEPS_PER_EPISODE} steps each.")
+    np.random.seed(SimulationConfig.SEED)
+    print(f"Random Seed set to: {SimulationConfig.SEED}")
+    print(f"Starting Simulation: {SimulationConfig.NUM_EPISODES} episodes, {SimulationConfig.STEPS_PER_EPISODE} steps each.")
     
-    # Initialize the Paper Environment
-    env = D2DEnvironmentPaper()
+    # Initialize the environment
+    env = D2DEnvironment()
     all_records = []
     
     # Loop through episodes
-    for episode in tqdm(range(PaperConfig.NUM_EPISODES), desc="Simulating Paper Episodes"):
-        # Reset environment for new episode
-        env.reset()
+    for episode in tqdm(range(SimulationConfig.NUM_EPISODES), desc="Simulating Episodes"):
+        # Reset environment for new episode (new positions, new shadowing)
+        initial_state = env.reset()
+        initial_state['episode_id'] = episode
+        all_records.append(initial_state)
         
         # Loop through time steps in the episode
-        for step in range(PaperConfig.STEPS_PER_EPISODE):
+        for step in range(SimulationConfig.STEPS_PER_EPISODE):
             state = env.step()
             state['episode_id'] = episode
             all_records.append(state)
@@ -37,7 +39,7 @@ def generate_paper_dataset():
     
     # Update column order for better readability
     cols = [
-        'episode_id', 'timestamp', 'optimal_mode',      # Episode, Time, and Current Mode  
+        'episode_id', 'timestamp', 'optimal_mode',      # Episode, Time, and Current Mode 
         'tx_pos_x', 'tx_pos_y',                         # Positions of Tx
         'rx_pos_x', 'rx_pos_y',                         # Positions of Rx
         'distance_tx_rx', 'distance_bs_rx',             # Distances (D2D: Tx to Rx, Cellular: BS to Rx)
@@ -49,16 +51,16 @@ def generate_paper_dataset():
         'throughput_d2d_mbps', 'throughput_cell_mbps',  # Throughputs (D2D and Cellular)
     ]
     
-    # FAILSAFE: Add any remaining columns
+    # FAILSAFE: Add any remaining columns that aren't in the priority list
     remaining_cols = [c for c in df.columns if c not in cols]
     df = df[cols + remaining_cols]
     
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(PaperConfig.OUTPUT_FILE), exist_ok=True)
+    # FAILSAFE: Ensure directory exists
+    os.makedirs(os.path.dirname(SimulationConfig.OUTPUT_FILE), exist_ok=True)
     
-    print(f"Saving {len(df)} samples to {PaperConfig.OUTPUT_FILE}...")
-    df.to_csv(PaperConfig.OUTPUT_FILE, index=False)
+    print(f"Saving {len(df)} samples to {SimulationConfig.OUTPUT_FILE}...")
+    df.to_csv(SimulationConfig.OUTPUT_FILE, index=False)
     print("Done!")
 
 if __name__ == "__main__":
-    generate_paper_dataset()
+    generate_dataset()

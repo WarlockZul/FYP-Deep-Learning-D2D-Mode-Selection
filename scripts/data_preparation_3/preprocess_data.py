@@ -7,7 +7,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 
 # Import the configuration file from Simulator
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from simulator.config import SimulationConfig
 
 def preprocess_data():
@@ -60,7 +61,7 @@ def preprocess_data():
     df = df.dropna(subset=['label'])
     
     # NOTE: Save intermediate CSV to check it in Excel
-    debug_path = "data/processed_debug.csv"
+    debug_path = "data/feature_engineering_debug.csv"
     df.to_csv(debug_path, index=False)
     print(f"Debug file saved to {debug_path} (Open in Excel to verify features)")
 
@@ -70,8 +71,8 @@ def preprocess_data():
     df[features] = scaler.fit_transform(df[features])
     
     # Save Scaler for future use during DL model inference
-    os.makedirs("models", exist_ok=True)
-    with open("models/scaler.pkl", "wb") as f:
+    os.makedirs("models/shared", exist_ok=True)
+    with open("models/shared/scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
     
     # Reshape data into sequences for DL model
@@ -107,15 +108,15 @@ def preprocess_data():
     print(f"Testing Sets (15%):    X={X_test.shape},  y={y_test.shape}")
     
     # Save .npy files
-    os.makedirs("data/processed", exist_ok=True)
-    np.save("data/processed/X_train.npy", X_train)
-    np.save("data/processed/X_val.npy", X_val)   
-    np.save("data/processed/X_test.npy", X_test)
-    np.save("data/processed/y_train.npy", y_train)
-    np.save("data/processed/y_val.npy", y_val)   
-    np.save("data/processed/y_test.npy", y_test)
+    os.makedirs("data/model_ready", exist_ok=True)
+    np.save("data/model_ready/X_train.npy", X_train)
+    np.save("data/model_ready/X_val.npy", X_val)   
+    np.save("data/model_ready/X_test.npy", X_test)
+    np.save("data/model_ready/y_train.npy", y_train)
+    np.save("data/model_ready/y_val.npy", y_val)   
+    np.save("data/model_ready/y_test.npy", y_test)
     
-    print("Processed data saved to data/processed/")
+    print("Processed data saved to data/model_ready/")
 
 if __name__ == "__main__":
     preprocess_data()

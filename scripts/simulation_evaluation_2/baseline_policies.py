@@ -4,7 +4,7 @@ import os
 import sys
 
 # Read in project root for imports
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 # Load the dataset based on the provided configuration
 # Use 'config' argument to choose between different configurations

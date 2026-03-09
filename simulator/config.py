@@ -6,7 +6,7 @@ class SimulationConfig:
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
     D2D_MAX_DIST_M = 250            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
-    OUTPUT_FILE = "data/simulation_data.csv"
+    OUTPUT_FILE = "data/raw/simulation_data.csv"
     
     # Mobility Settings
     PROBABILITY_START_MOVING = 0.10 # Probability that a UE starts moving in a time step

@@ -6,7 +6,7 @@ class PaperConfig:
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
     D2D_MAX_DIST_M = 400            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
-    OUTPUT_FILE = "data/test_simulation_data.csv"
+    OUTPUT_FILE = "data/raw/test_simulation_data.csv"
     
     # Mobility Settings
     PROBABILITY_START_MOVING = 1.00 # Probability that a UE starts moving in a time step
