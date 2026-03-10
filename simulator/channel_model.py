@@ -1,6 +1,28 @@
 import numpy as np
 from simulator.config import SimulationConfig
 
+'''
+SINR Formula:
+
+SINR = (P_i * G_ij) / Sum of [(p_k * P_k * G_kj) + Sigma^2]
+* Sum of interference exclude Tx-Rx pair (i,j) and include all active interferers k
+
+Where:
+- i: Transmitter index
+- j: Receiver index
+- k: Interferer index (excluding the Tx-Rx pair)
+- P_i:      Transmission power of transmitter i (Watts)
+- G_ij:     Channel gain from transmitter i to receiver j (Unitless, linear scale)
+- p_k:      Expected load from the interferer k    
+- P_k:      Transmission power of interferer k (Watts)
+- G_kj:     Channel gain from interferer k to receiver j (Unitless, linear scale)
+- Sigma^2:  Noise power at receiver j (Watts)
+
+Provided: P_i, P_k
+Manipulated: p_k, Sigma^2
+Calculated: G_ij, G_kj
+'''
+
 class ChannelModel:
     # Helper to calculate Path Loss for cellular mode
     @staticmethod
@@ -50,27 +72,28 @@ class ChannelModel:
         return np.random.exponential(scale=1.0)
 
     # Helper to compute final received power in Watts considering all channel effects.
-    # `tx_power_dbm`: Transmit power in dBm (P_i)
+    # NOTE: Computes G_ij and multiple with P_i (not including interference or noise)
     # NOTE: [Refer to research paper]
     @staticmethod
     def compute_received_power(tx_power_dbm, distance_m, is_d2d=False):
-        # Calculate Path Loss (dB)
+        # 1. Calculate Path Loss (dB)
         if is_d2d:
             path_loss_db = ChannelModel.calculate_path_loss_d2d(distance_m)
         else:
             path_loss_db = ChannelModel.calculate_path_loss_cellular(distance_m)
             
-        # Calculate Shadowing (dB)
+        # 2. Calculate Shadowing (dB)
         shadowing_db = ChannelModel.get_shadowing()
         
-        # Combine Large-scale fading (dB)
-        # Received_dB = Transmitted_dB - PL_dB + Shadowing_dB
+        # 3. Combine Large-scale fading (dB)
+        # Received_dB = Transmitted_dB - PathLoss_dB + Shadowing_dB
+        # Rx = Tx - PL (dB) + Shadowing (dB)
         rx_power_dbm = tx_power_dbm - path_loss_db + shadowing_db
         
-        # Convert to Linear (Watts)
+        # 4. Convert to Linear (Watts)
         rx_power_watts = 10 ** ((rx_power_dbm - 30) / 10)
         
-        # Apply Small-scale Rayleigh Fading (Linear multiplication)
+        # 5. Apply Small-scale Rayleigh Fading (Linear multiplication)
         # Transmission Power x Channel Gain (P_i x G_ij)
         channel_gain = ChannelModel.get_rayleigh_fading_gain()
         final_rx_power_watts = rx_power_watts * channel_gain

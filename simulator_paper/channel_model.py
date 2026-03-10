@@ -1,6 +1,28 @@
 import numpy as np
 from simulator_paper.config import PaperConfig
 
+'''
+SINR Formula:
+
+SINR = (P_i * G_ij) / Sum of [(p_k * P_k * G_kj) + Sigma^2]
+* Sum of interference exclude Tx-Rx pair (i,j) and include all active interferers k
+
+Where:
+- i: Transmitter index
+- j: Receiver index
+- k: Interferer index (excluding the Tx-Rx pair)
+- P_i:      Transmission power of transmitter i (Watts)
+- G_ij:     Channel gain from transmitter i to receiver j (Unitless, linear scale)
+- p_k:      Expected load from the interferer k    
+- P_k:      Transmission power of interferer k (Watts)
+- G_kj:     Channel gain from interferer k to receiver j (Unitless, linear scale)
+- Sigma^2:  Noise power at receiver j (Watts)
+
+Provided: P_i, P_k
+Manipulated: p_k, Sigma^2
+Calculated: G_ij, G_kj
+'''
+
 class ChannelModelPaper:
     # Helper to calculate Path Loss for cellular mode
     @staticmethod
@@ -25,7 +47,7 @@ class ChannelModelPaper:
         # Initialize carrier frequency
         freq_mhz = PaperConfig.CARRIER_FREQ_MHZ
         
-        # D2D Path Loss: 32.45 + 20 * log10(f_MHz) + 20 * log10(d_km)
+        # D2D Path Loss Equation: 32.45 + 20 * log10(f in MHz) + 20 * log10(d in km)
         # NOTE: [Refer to research paper]
         pl = PaperConfig.PATH_LOSS_D2D_A + \
              (PaperConfig.PATH_LOSS_D2D_B_FREQ * np.log10(freq_mhz)) + \
@@ -33,6 +55,8 @@ class ChannelModelPaper:
         return pl
 
     # Helper to compute final received power in Watts considering all channel effects.
+    # NOTE: Computes G_ij and multiple with P_i (not including interference or noise)
+    # NOTE: [Refer to research paper]
     @staticmethod
     def compute_received_power(tx_power_dbm, distance_m, is_d2d=False):
         # 1. Calculate Path Loss (dB)

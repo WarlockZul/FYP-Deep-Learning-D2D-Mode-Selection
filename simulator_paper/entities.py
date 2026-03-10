@@ -12,7 +12,7 @@ class BaseStation:
     def get_distance_to(self, other_entity):
         return np.linalg.norm(self.position - other_entity.position)
 
-# Represents a mobile device (UE) in the Paper Environment.
+# Represents a mobile device, or user equipement (UE).
 class UserEquipment:
     def __init__(self, device_id):
         # Initialize Device ID
@@ -45,7 +45,7 @@ class UserEquipment:
     def move(self):
         # --- CASE 1: PAUSED ---
         if self.is_paused:
-            # Check probability to start moving (0.10 in your config)
+            # Check probability to start moving
             if np.random.rand() < PaperConfig.PROBABILITY_START_MOVING:
                 # Start moving to a new random destination
                 self.is_paused = False
@@ -56,14 +56,13 @@ class UserEquipment:
 
         # --- CASE 2: MOVING ---
         dt = PaperConfig.TIME_STEP_S
-        
-        # Calculate direction vector to destination
-        direction_vector = self.destination - self.position
 
-        # Calculate distance to destination
+        # Calculate the following:
+        # - Direction vector to destination
+        # - Distance to destination
+        # - Step distance for this time step
+        direction_vector = self.destination - self.position
         distance_to_dest = np.linalg.norm(direction_vector)
-        
-        # Calculate step distance
         step_distance = self.speed * dt
         
         # Check if we reach the destination or overshoot
@@ -73,7 +72,6 @@ class UserEquipment:
 
             # Transition to PAUSE state/stop moving
             self.is_paused = True
-            
         else:
             # Continue moving towards destination
             unit_vector = direction_vector / distance_to_dest

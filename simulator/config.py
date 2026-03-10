@@ -4,7 +4,7 @@ class SimulationConfig:
     # Simulation Settings 
     NUM_EPISODES = 100              # How many separate runs to do
     STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
-    D2D_MAX_DIST_M = 250            # Maximum distance to consider D2D pairing feasible
+    D2D_MAX_DIST_M = 400            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
     OUTPUT_FILE = "data/raw/simulation_data.csv"
     
@@ -13,7 +13,7 @@ class SimulationConfig:
 
     # Channel Model Settings
     USE_RAYLEIGH_FADING = True      # Toggle fast fading True: on, False: off
-    INTERFERENCE_LOAD_FACTOR = 1.0  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
+    INTERFERENCE_LOAD_FACTOR = 0.3  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
     BANDWIDTH_HZ = 100e6            # System Bandwidth
     NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     HANDOVER_LATENCY_S = 0.050      # Handover latency in seconds (50 ms)

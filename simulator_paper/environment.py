@@ -70,10 +70,6 @@ class D2DEnvironmentPaper:
         # Return the new state
         return self._compute_physics_state()
 
-    def get_state(self):
-        # Return the current state (used for t=0 reset)
-        return self._compute_physics_state()
-
     def _compute_physics_state(self):
         assert self.d2d_tx is not None
         assert self.d2d_rx is not None

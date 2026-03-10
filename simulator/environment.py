@@ -36,10 +36,16 @@ class D2DEnvironment:
         self.d2d_rx = UserEquipment(device_id="Target_Rx", speed_type=current_episode_speed)
         
         # Override Rx position to be within max D2D distance from Tx
-        angle = np.random.uniform(0, 2*np.pi)
-        radius = np.random.uniform(10, SimulationConfig.D2D_MAX_DIST_M)
-        rx_pos = self.d2d_tx.position + np.array([radius * np.cos(angle), radius * np.sin(angle)])
-        self.d2d_rx.position = rx_pos 
+        # Meaning that the D2D pair starts with D2D mode first, and can switch to Cellular mode if conditions worsen
+        while True:
+            angle = np.random.uniform(0, 2*np.pi)
+            radius = np.random.uniform(10, SimulationConfig.D2D_MAX_DIST_M)
+            rx_pos = self.d2d_tx.position + np.array([radius * np.cos(angle), radius * np.sin(angle)])
+            
+            # Check if this new position is within the 500m cell radius from BS (0,0)
+            if np.linalg.norm(rx_pos) <= SimulationConfig.CELL_RADIUS_M:
+                self.d2d_rx.position = rx_pos 
+                break
         
         # Create Interfering Devices with moderate speed (10 to 20 interferers)
         # NOTE: Number of interferers remain constant during an episode, changes each episode
@@ -53,7 +59,7 @@ class D2DEnvironment:
             for i in range(num_interferers)
         ]
         
-        return self.get_state()
+        return self._compute_physics_state()
 
     def step(self):
         assert self.d2d_tx is not None
@@ -69,10 +75,6 @@ class D2DEnvironment:
             device.move()
             
         # Return the new state
-        return self._compute_physics_state()
-
-    def get_state(self):
-        # Return the current state (used for t=0 reset)
         return self._compute_physics_state()
 
     def _compute_physics_state(self):
@@ -130,16 +132,21 @@ class D2DEnvironment:
             optimal_mode = "D2D" if tput_d2d_mbps >= tput_cell_mbps else "Cellular"
         # T>0: Consider switching cost
         else:
-            # Staying in D2D costs nothing. Switching to Cell costs penalty.
+            # Staying in D2D costs nothing. Switching to Cellular costs penalty.
             if self.last_optimal_mode == "D2D":
                 payoff_stay = tput_d2d_mbps
                 payoff_switch = tput_cell_mbps * penalty_factor
                 optimal_mode = "D2D" if payoff_stay >= payoff_switch else "Cellular"
-            # Staying in Cell costs nothing. Switching to D2D costs penalty.
+            # Staying in Cellular costs nothing. Switching to D2D costs penalty.
             else:
                 payoff_stay = tput_cell_mbps
                 payoff_switch = tput_d2d_mbps * penalty_factor
                 optimal_mode = "Cellular" if payoff_stay >= payoff_switch else "D2D"
+        
+        # Prohibit D2D communication if distance exceeds 400 m
+        # NOTE: Refer to main research paper
+        if dist_d2d > SimulationConfig.D2D_MAX_DIST_M:
+            optimal_mode = "Cellular"
 
         # Update history
         self.last_optimal_mode = optimal_mode
