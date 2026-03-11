@@ -11,6 +11,36 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 from simulator.config import SimulationConfig
 
+def clean_dataset(df):
+    print("Cleaning Dataset: Handling Infs, NaNs, and Outliers...")
+    
+    # 1. Handle Infinite Values
+    # Logarithmic formulas (like SINR in dB) can produce -inf if the linear value is 0.
+    # Replace inf and -inf with NaN to handle them safely.
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    
+    # 2. Handle Missing Values (NaNs)
+    # Forward fill (ffill) uses the previous second's value to patch the hole. 
+    # Backfill (bfill) catches any NaNs that might occur at the very first row.
+    df.ffill(inplace=True)
+    df.bfill(inplace=True)
+    
+    # 3. Handle Extreme Outliers (Clipping)
+    # Fast Fading can cause unrealistic massive spikes or deep fades.
+    # Clip the top 1% and bottom 1% of values to keep the dataset stable for the neural network.
+    cols_to_clip = [
+        'sinr_d2d_db', 'sinr_cell_db', 
+        'throughput_d2d_mbps', 'throughput_cell_mbps', 
+        'interference_dbm'
+    ]
+    for col in cols_to_clip:
+        lower_bound = df[col].quantile(0.01)
+        upper_bound = df[col].quantile(0.99)
+        df[col] = df[col].clip(lower=lower_bound, upper=upper_bound)
+        
+    print("Dataset cleaned: Handled Infs, NaNs, and Outliers.")
+    return df
+
 def preprocess_data():
     # Load simulation data from data/ folder
     input_path = SimulationConfig.OUTPUT_FILE
@@ -22,6 +52,9 @@ def preprocess_data():
     
     # Sort to ensure time order is correct for rolling calculations
     df = df.sort_values(by=['episode_id', 'timestamp'])
+
+    # Clean the dataset by handling Infs, NaNs, and Outliers
+    df = clean_dataset(df)
 
     # Perform Feature Engineering
     # - For rolling means & std devs: Window size = 5 timesteps (5 seconds)
@@ -56,12 +89,15 @@ def preprocess_data():
     print(f"Feature List: {features}")
     
     # Prepare labels (Y)
+    # Shift(-1): Pulls the next timestep's SINR to the current row.
+    # dropna: Drop the last timestep of every episode because it has no "next" step to predict.
     print("Creating Regression Targets (Next Step SINR)...")
     df['label'] = df.groupby('episode_id')['sinr_d2d_db'].shift(-1)
     df = df.dropna(subset=['label'])
     
-    # NOTE: Save intermediate CSV to check it in Excel
-    debug_path = "data/feature_engineering_debug.csv"
+    # NOTE: Save intermediate CSV file containing the new features to check it in Excel
+    debug_path = "data/model_ready/feature_engineering_debug.csv"
+    os.makedirs(os.path.dirname(debug_path), exist_ok=True)
     df.to_csv(debug_path, index=False)
     print(f"Debug file saved to {debug_path} (Open in Excel to verify features)")
 
@@ -83,13 +119,13 @@ def preprocess_data():
     
     # Convert to numpy arrays to facilitate reshaping 
     X_data = np.asarray(df[features].to_numpy(dtype=float))
-    y_data = np.asarray(df['label'].to_numpy(dtype=int))
+    y_data = np.asarray(df['label'].to_numpy(dtype=float))
     
     try:
         X_sequenced = X_data.reshape(num_episodes, steps_per_episode, num_features)
         y_sequenced = y_data.reshape(num_episodes, steps_per_episode, 1)
     except ValueError as e:
-        print(f"Reshape Error: {e}")
+        print(f"Reshape Error: {e}. Check if total rows ({len(df)}) matches {num_episodes} * {steps_per_episode}.")
         return
 
     print(f"Data Reshaped: X={X_sequenced.shape}, y={y_sequenced.shape}")

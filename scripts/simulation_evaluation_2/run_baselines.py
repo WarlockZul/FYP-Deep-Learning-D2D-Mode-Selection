@@ -13,7 +13,7 @@ from simulator.config import SimulationConfig
 from simulator_paper.config import PaperConfig
 
 # NOTE: Change this variable to switch between different configurations (PAPER or PROPOSED)
-ENV_MODE = "PAPER"
+ENV_MODE = "PROPOSED"  # Options: "PAPER", "PROPOSED"
 
 def main():
     # Select configuration based on ENV_MODE
