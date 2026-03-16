@@ -40,7 +40,7 @@ def load_processed_data():
 # Build the GRU model
 def build_gru_model(input_shape):
     """
-    Constructs the GRU model based on FYP Proposal:
+    Constructs the GRU model based on these specifications:
     - 2 GRU Layers
     - 64 Hidden Units
     - Dropout 0.2
@@ -135,6 +135,7 @@ def plot_training_history(history):
     plt.legend()
     
     plt.tight_layout()
+    plt.savefig("models/gru/gru_training_curve.png", dpi=300)
     plt.show()
 
 if __name__ == "__main__":

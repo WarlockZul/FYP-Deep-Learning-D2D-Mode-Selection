@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow.keras.models import Sequential # pyright: ignore[reportMissingModuleSource]
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization # pyright: ignore[reportMissingModuleSource]
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization, Flatten # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource]
@@ -15,7 +15,7 @@ def set_seeds(seed_value=42):
     random.seed(seed_value)
     np.random.seed(seed_value)
     tf.random.set_seed(seed_value)
-    
+
     # Force TensorFlow to use deterministic operations where possible
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
@@ -31,31 +31,49 @@ def load_processed_data():
     X_val   = np.load(os.path.join(base_path, "X_val.npy"))
     y_val   = np.load(os.path.join(base_path, "y_val.npy"))
     
-    print(f"Loaded Data:")
-    print(f"  Train: X={X_train.shape}, y={y_train.shape}")
-    print(f"  Val:   X={X_val.shape},   y={y_val.shape}")
-    
     return X_train, y_train, X_val, y_val
 
-# Build the LSTM model
-def build_lstm_model(input_shape):
+# Create sliding windows for CNN/DNN input to predict one step at a time from the 300-second sequences
+# Converts (Episodes, 300, Features) into (Total_Windows, Window_Size, Features)
+def create_sliding_windows(X, y, window_size=16):
+    X_win, y_win = [], []
+    for i in range(X.shape[0]):
+
+        # Slide a window across the 300 timesteps
+        for t in range(X.shape[1] - window_size + 1):
+            X_win.append(X[i, t:t+window_size, :])
+
+            # The target is the label of the last timestep in the window
+            y_win.append(y[i, t+window_size-1, :])
+            
+    return np.array(X_win), np.array(y_win)
+
+# Build the DNN model
+def build_dnn_model(input_shape):
     """
-    Constructs the LSTM model based on these specifications:
-    - 2 LSTM Layers
-    - 128 Hidden Units
-    - Dropout 0.2
+    Constructs the DNN model based on these specifications:
+    - Flatten Layer
+    - 3 Fully Connected Layers (256 -> 128 -> 64)
+    - ReLU Activation
     """
-    # L2 Regularization value
     reg_val = 0.00001
     
     model = Sequential([
-        # Layer 1: LSTM
-        LSTM(128, input_shape=input_shape, return_sequences=True),
+        # RESTORED: Flatten the 2D window into a 1D vector
+        Flatten(input_shape=input_shape),
+        
+        # Layer 1: Dense Feed-Forward (256 Neurons)
+        Dense(256, activation='relu'),
         BatchNormalization(), 
         Dropout(0.2),        
         
-        # Layer 2: LSTM
-        LSTM(128, return_sequences=True),
+        # Layer 2: Dense Feed-Forward (128 Neurons)
+        Dense(128, activation='relu'),
+        BatchNormalization(),
+        Dropout(0.2),
+        
+        # Layer 3: Dense Feed-Forward (64 Neurons)
+        Dense(64, activation='relu'),
         BatchNormalization(),
         Dropout(0.2),
         
@@ -64,32 +82,34 @@ def build_lstm_model(input_shape):
     ])
     
     model.compile(
-        optimizer=Adam(learning_rate=0.001),
-        loss='mse',  
-        metrics=['mae'] 
+        optimizer=Adam(learning_rate=0.001), 
+        loss='mse', 
+        metrics=['mae']
     )
-    
     return model
 
 # Main training function
 def main():
-    X_train, y_train, X_val, y_val = load_processed_data()
+    X_train_raw, y_train_raw, X_val_raw, y_val_raw = load_processed_data()
+    
+    print("\nReformatting data into sliding windows...")
+    X_train, y_train = create_sliding_windows(X_train_raw, y_train_raw, window_size=16)
+    X_val, y_val = create_sliding_windows(X_val_raw, y_val_raw, window_size=16)
+    
+    print(f"Windowed Train Data: X={X_train.shape}, y={y_train.shape}")
     
     input_shape = (X_train.shape[1], X_train.shape[2]) 
+    model = build_dnn_model(input_shape)
+    model.summary()
     
-    # Build the LSTM Model
-    model = build_lstm_model(input_shape)
-    model.summary() 
-    
-    # Set up Callbacks for Training (Updated to lstm folder)
-    os.makedirs("models/lstm", exist_ok=True)
+    os.makedirs("models/dnn", exist_ok=True)
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True),
-        ModelCheckpoint("models/lstm/lstm_model.keras", monitor='val_mae', save_best_only=True),
-        CSVLogger("models/lstm/lstm_training_log.csv", separator=',', append=False)
+        ModelCheckpoint("models/dnn/dnn_model.keras", monitor='val_mae', save_best_only=True),
+        CSVLogger("models/dnn/dnn_training_log.csv", separator=',', append=False)
     ]
     
-    print("\nStarting LSTM Training...")
+    print("\nStarting DNN Training...")
     history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
@@ -100,7 +120,7 @@ def main():
     )
     
     plot_training_history(history)
-    print("\nTraining Complete. Best model saved to 'models/lstm/lstm_model.keras'")
+    print("\nTraining Complete. Best model saved to 'models/dnn/dnn_model.keras'")
 
 def plot_training_history(history):
     mae = history.history['mae']
@@ -114,18 +134,18 @@ def plot_training_history(history):
     plt.subplot(1, 2, 1)
     plt.plot(epochs, mae, 'bo-', label='Training MAE')
     plt.plot(epochs, val_mae, 'ro-', label='Validation MAE')
-    plt.title('LSTM: Mean Absolute Error')
+    plt.title('DNN: Mean Absolute Error')
     plt.ylabel('Error (dB)')
     plt.legend()
     
     plt.subplot(1, 2, 2)
     plt.plot(epochs, loss, 'bo-', label='Training Loss')
     plt.plot(epochs, val_loss, 'ro-', label='Validation Loss')
-    plt.title('LSTM: Mean Squared Error (Loss)')
+    plt.title('DNN: Mean Squared Error (Loss)')
     plt.legend()
     
     plt.tight_layout()
-    plt.savefig("models/lstm/lstm_training_curve.png", dpi=300)
+    plt.savefig("models/dnn/dnn_training_curve.png", dpi=300) 
     plt.show()
 
 if __name__ == "__main__":
