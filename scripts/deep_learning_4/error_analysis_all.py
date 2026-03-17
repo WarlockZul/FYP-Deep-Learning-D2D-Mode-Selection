@@ -29,19 +29,19 @@ def create_sliding_windows(X, y, window_size=16):
 
     return np.array(X_win), np.array(y_win)
 
+# Main Function to Perform Error Analysis for All Models
 def perform_error_analysis():
+    # Step 1: Prepare Validation Data, create sliding windows for CNN/DNN, and load all models
     print("Loading Validation Data...")
     X_val_raw, y_val_raw = load_validation_data()
-    
-    # Pre-generate the windowed data so we don't calculate it twice
     print("Generating Sliding Windows for CNN/DNN...")
     X_val_win, y_val_win = create_sliding_windows(X_val_raw, y_val_raw, window_size=16)
-
     models_to_evaluate = ['gru', 'lstm', 'cnn', 'dnn']
     
     # Dictionary to store results for the final comparison plot
     results_dict = {}
 
+    # Step 2: Loop through each model, compute residuals, derive confidence intervals, and save parameters
     for model_name in models_to_evaluate:
         print(f"\n" + "="*40)
         print(f" ANALYZING MODEL: {model_name.upper()}")
@@ -55,17 +55,17 @@ def perform_error_analysis():
         # Load Model
         model = tf.keras.models.load_model(model_path)
         
-        # Select correct data format
+        # Select correct data format (Raw: GRU/LSTM, Windows: CNN/DNN)
         if model_name in ['gru', 'lstm']:
             X_val, y_val = X_val_raw, y_val_raw
         else:
             X_val, y_val = X_val_win, y_val_win
 
-        # Compute Residuals (Error = True - Predicted)
+        # Step 2.1: Compute Residuals (Error = True SINR - Predicted SINR)
         y_pred = model.predict(X_val, verbose=0)
         residuals = (y_val.flatten() - y_pred.flatten())
         
-        # Derive 95% Confidence Intervals
+        # Step 2.2: Derive 95% Confidence Intervals
         lower_bound = np.percentile(residuals, 2.5)
         upper_bound = np.percentile(residuals, 97.5)
         
@@ -73,7 +73,8 @@ def perform_error_analysis():
         print(f"95% CI: [{lower_bound:.4f} dB, {upper_bound:.4f} dB]")
         print(f"CI Width: {upper_bound - lower_bound:.4f} dB")
         
-        # Save Parameters for Threshold Module
+        # Step 2.3: Save Parameters for Threshold Module 
+        # Bandwidth selection chosen: h = 1.0 (0.5 for upper bound and another 0.5 for lower bound)
         bw_method = 0.5  
         error_params = {
             'lower_bound': lower_bound,
@@ -97,24 +98,22 @@ def perform_error_analysis():
         # Clear memory to prevent slowdowns
         tf.keras.backend.clear_session()
 
-    # ==========================================
-    # FINAL COMPARISON PLOT
-    # ==========================================
+    # Step 3: Generate Final Comparison Plot with KDEs and Confidence Intervals for All Models
     if results_dict:
         print("\nGenerating Final Comparison Plot...")
         plot_model_comparisons(results_dict)
 
+# Function to plot Gaussian KDEs and confidence intervals for all models on the same graph
 def plot_model_comparisons(results_dict):
-    """Generates a combined KDE plot to compare all models."""
     plt.figure(figsize=(12, 7))
-    
     colors = {'gru': 'blue', 'lstm': 'green', 'cnn': 'red', 'dnn': 'purple'}
     
     for model_name, data in results_dict.items():
         residuals = data['residuals']
         
         # Fit KDE
-        kde = gaussian_kde(residuals, bw_method=0.5) 
+        # NOTE: Edit bandwith selection (h = 1.0) here
+        kde = gaussian_kde(residuals, bw_method=1.0) 
         x_grid = np.linspace(-40, 40, 1000) # Fixed x-axis for fair visual comparison
         pdf_values = kde(x_grid)
         
