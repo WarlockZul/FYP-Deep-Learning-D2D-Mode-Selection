@@ -7,7 +7,7 @@ class ThresholdSelector:
         self.bandwidth_hz = bandwidth_hz
 
     # Converts SINR (dB) to an equivalent throughput (Mbps) using the Shannon formula.
-    # Equation: R = BW * log2(1 + SINR_linear)
+    # Equation: R = BW * log2(1 + SINR_linear), R is the throughput in bps, BW is the bandwidth in Hz, and SINR_linear is the linear scale of SINR.
     def shannon_throughput(self, sinr_db):
         sinr_linear = 10 ** (sinr_db / 10)
         throughput_bps = self.bandwidth_hz * np.log2(1 + sinr_linear)
