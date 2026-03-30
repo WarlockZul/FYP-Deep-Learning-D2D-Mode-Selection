@@ -31,6 +31,7 @@ class ThresholdSelector:
         return np.percentile(residuals, percentile_target)
 
     # PCR Constraint Function to find a stricter margin based on the Beta distribution of residuals and a confidence level.
+    # NOTE: xi set at 0.05 and confidence at 0.95 by default from proposal
     def get_pcr_margin(self, residuals, xi=0.05, confidence=0.95):
         n = len(residuals)
         sorted_res = np.sort(residuals)

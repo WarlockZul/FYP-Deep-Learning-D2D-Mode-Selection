@@ -77,9 +77,7 @@ class OnlineModeSelector:
         
         return new_mode, log_data
 
-# ==========================================
-# QUICK TEST EXECUTION
-# ==========================================
+# Function to test run the online selector with dummy data
 if __name__ == "__main__":
     # --- USER CONTROLS ---
     SELECTED_MODEL = 'cnn'       # Options: 'gru', 'lstm', 'cnn', 'dnn'
