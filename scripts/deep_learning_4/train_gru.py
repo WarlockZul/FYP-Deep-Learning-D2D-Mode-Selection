@@ -9,6 +9,8 @@ from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModu
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 
+TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
+
 # Function to ensure deterministic/constant outputs for every run
 def set_seeds(seed_value=42):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
@@ -23,8 +25,8 @@ def set_seeds(seed_value=42):
 set_seeds(42)
 
 # Load the processed data (train and validation sets) from data/model_ready/
-def load_processed_data():
-    base_path = "data/model_ready"
+def load_processed_data(mode):
+    base_path = f"data/model_ready/{mode}/"
     
     X_train = np.load(os.path.join(base_path, "X_train.npy"))
     y_train = np.load(os.path.join(base_path, "y_train.npy"))
@@ -33,7 +35,7 @@ def load_processed_data():
     
     print(f"Loaded Data:")
     print(f"  Train: X={X_train.shape}, y={y_train.shape}")
-    print(f"  Val:   X={X_val.shape},   y={y_val.shape}")
+    print(f"  Val:   X={X_val.shape},   y={y_val.shape}") 
     
     return X_train, y_train, X_val, y_val
 
@@ -75,7 +77,7 @@ def build_gru_model(input_shape):
 # Main training function
 def main():
     # Load data from processed files
-    X_train, y_train, X_val, y_val = load_processed_data()
+    X_train, y_train, X_val, y_val = load_processed_data(TARGET_MODE)
     
     # Check input shape
     # shape[1]: Time steps
@@ -87,11 +89,12 @@ def main():
     model.summary() 
     
     # Set up Callbacks for Training 
-    os.makedirs("models/gru", exist_ok=True)
+    save_dir = f"models/{TARGET_MODE}/gru"
+    os.makedirs(save_dir, exist_ok=True)
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True),
-        ModelCheckpoint("models/gru/gru_model.keras", monitor='val_mae', save_best_only=True),
-        CSVLogger("models/gru/gru_training_log.csv", separator=',', append=False)
+        ModelCheckpoint(f"{save_dir}/gru_model.keras", monitor='val_mae', save_best_only=True),
+        CSVLogger(f"{save_dir}/gru_training_log.csv", separator=',', append=False)
     ]
     
     # Train the GRU model
@@ -106,11 +109,11 @@ def main():
     )
     
     # Plot training history
-    plot_training_history(history)
-    print("\nTraining Complete. Best model saved to 'models/gru_model.keras'")
+    plot_training_history(history, TARGET_MODE)
+    print(f"\nTraining Complete. Best model saved to '{save_dir}/gru_model.keras'")
 
 # Plot accuracy and loss over time (epochs)
-def plot_training_history(history):
+def plot_training_history(history, mode):
     mae = history.history['mae']
     val_mae = history.history['val_mae']
     loss = history.history['loss']
@@ -123,7 +126,7 @@ def plot_training_history(history):
     plt.subplot(1, 2, 1)
     plt.plot(epochs, mae, 'bo-', label='Training MAE')
     plt.plot(epochs, val_mae, 'ro-', label='Validation MAE')
-    plt.title('Mean Absolute Error')
+    plt.title(f'{mode.upper()} Model: Mean Absolute Error')
     plt.ylabel('Error (dB)')
     plt.legend()
     
@@ -131,11 +134,15 @@ def plot_training_history(history):
     plt.subplot(1, 2, 2)
     plt.plot(epochs, loss, 'bo-', label='Training Loss')
     plt.plot(epochs, val_loss, 'ro-', label='Validation Loss')
-    plt.title('Mean Squared Error (Loss)')
+    plt.title(f'{mode.upper()} Model: Mean Squared Error (Loss)')
     plt.legend()
     
     plt.tight_layout()
-    plt.savefig("models/gru/gru_training_curve.png", dpi=300)
+    
+    # Save graph dynamically
+    save_dir = f"models/{mode}/gru"
+    os.makedirs(save_dir, exist_ok=True)
+    plt.savefig(f"{save_dir}/gru_training_curve.png", dpi=300)
     plt.show()
 
 if __name__ == "__main__":

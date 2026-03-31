@@ -7,19 +7,17 @@ import pickle
 from threshold_selection import ThresholdSelector
 from online_selector import OnlineModeSelector
 
+# Load the unseen testing dataset (the final 15% of the simulation data)
 def load_test_data():
-    """Loads the unseen testing dataset (the final 15% of your data)"""
     base_path = "data/model_ready"
     X_test = np.load(os.path.join(base_path, "X_test.npy"))
     y_test = np.load(os.path.join(base_path, "y_test.npy"))
     return X_test, y_test
 
+# Calculates PICP and MPIW for the given true values, predictions, and margins.
+# PICP: % of true values that fell safely inside the confidence bounds.
+# MPIW: The average width of those bounds.
 def calculate_uncertainty_metrics(y_true, y_pred, lower_margin, upper_margin):
-    """
-    Calculates PICP and MPIW.
-    PICP: % of true values that fell safely inside our confidence bounds.
-    MPIW: The average width of those bounds.
-    """
     # The predicted boundaries
     lower_bounds = y_pred + lower_margin
     upper_bounds = y_pred + upper_margin

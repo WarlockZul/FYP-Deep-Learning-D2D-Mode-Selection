@@ -41,58 +41,53 @@ def clean_dataset(df):
     print("Dataset cleaned: Handled Infs, NaNs, and Outliers.")
     return df
 
-def preprocess_data():
-    # Load simulation data from data/ folder
-    input_path = SimulationConfig.OUTPUT_FILE
-    if not os.path.exists(input_path):
-        raise FileNotFoundError(f"File {input_path} not found.")
+# Generate separate datasets for D2D and Cellular modes with engineered features and labels
+def generate_dataset_for_mode(df_raw, mode):
+    df = df_raw.copy()
+    print(f"\n--- Generating Dataset for {mode.upper()} Mode ---")
     
-    print(f"Loading data from {input_path}...")
-    df = pd.read_csv(input_path)
-    
-    # Sort to ensure time order is correct for rolling calculations
-    df = df.sort_values(by=['episode_id', 'timestamp'])
+    if mode == 'D2D':
+        target_sinr = 'sinr_d2d_db'
+        target_tput = 'throughput_d2d_mbps'
+        save_dir = "data/model_ready/d2d"
+    else:
+        target_sinr = 'sinr_cell_db'
+        target_tput = 'throughput_cell_mbps'
+        save_dir = "data/model_ready/cellular"
 
-    # Clean the dataset by handling Infs, NaNs, and Outliers
-    df = clean_dataset(df)
-
-    # Perform Feature Engineering
+    # Perform Feature Engineering based on mode (D2D or Cellular)
     # - For rolling means & std devs: Window size = 5 timesteps (5 seconds)
     # - Group by episode_id to avoid leakage between episodes
-    print("Performing Feature Engineering (Lags, Rolling Means)...")
-    df['sinr_d2d_mean_5s'] = df.groupby('episode_id')['sinr_d2d_db'].rolling(5, min_periods=1).mean().reset_index(0, drop=True)
-    df['sinr_d2d_std_5s'] = df.groupby('episode_id')['sinr_d2d_db'].rolling(5, min_periods=1).std().fillna(0).reset_index(0, drop=True)
-    df['throughput_rolling_mean'] = df.groupby('episode_id')['throughput_d2d_mbps'].rolling(5, min_periods=1).mean().reset_index(0, drop=True)
+    df['sinr_mean_5s'] = df.groupby('episode_id')[target_sinr].rolling(5, min_periods=1).mean().reset_index(0, drop=True)
+    df['sinr_std_5s'] = df.groupby('episode_id')[target_sinr].rolling(5, min_periods=1).std().fillna(0).reset_index(0, drop=True)
+    df['tput_mean_5s'] = df.groupby('episode_id')[target_tput].rolling(5, min_periods=1).mean().reset_index(0, drop=True)
     
     # - For lagged Features: Create lags for SINR and Interference
     # - Lags: 1, 2, 4, 8, 16 seconds
     # - Fill NaNs with 0 (indicating no prior data)
     lags = [1, 2, 4, 8, 16]
     for lag in lags:
-        df[f'sinr_lag_{lag}'] = df.groupby('episode_id')['sinr_d2d_db'].shift(lag).fillna(0)
+        df[f'sinr_lag_{lag}'] = df.groupby('episode_id')[target_sinr].shift(lag).fillna(0)
         df[f'interf_lag_{lag}'] = df.groupby('episode_id')['interference_dbm'].shift(lag).fillna(0)
     
-    # Define the full list of features (X)
-    # Add the generated lag names to the list dynamically
+    # Universal features + Mode-specific engineered features
     features = [
-        'sinr_d2d_db', 'sinr_cell_db', 
-        'throughput_d2d_mbps', 'throughput_cell_mbps', 
-        'distance_tx_rx', 'distance_bs_rx',
-        'interference_dbm',
-        'sinr_d2d_mean_5s', 'sinr_d2d_std_5s', 'throughput_rolling_mean'
+        target_sinr, target_tput, 
+        'distance_tx_rx', 'distance_bs_rx', 'interference_dbm',
+        'sinr_mean_5s', 'sinr_std_5s', 'tput_mean_5s'
     ]
     for lag in lags:
         features.append(f'sinr_lag_{lag}')
         features.append(f'interf_lag_{lag}')
-    
+
     print(f"Total Features Selected: {len(features)}")
     print(f"Feature List: {features}")
-    
-    # Prepare labels (Y)
+        
+    # Prepare labels (Y) (Predicting the next timestep of the target mode)
     # Shift(-1): Pulls the next timestep's SINR to the current row.
     # dropna: Drop the last timestep of every episode because it has no "next" step to predict.
-    print("Creating Regression Targets (Next Step SINR)...")
-    df['label'] = df.groupby('episode_id')['sinr_d2d_db'].shift(-1)
+    print("Creating Targets (Next Step SINR)...")
+    df['label'] = df.groupby('episode_id')[target_sinr].shift(-1)
     df = df.dropna(subset=['label'])
     
     # NOTE: Save intermediate CSV file containing the new features to check it in Excel
@@ -107,52 +102,55 @@ def preprocess_data():
     df[features] = scaler.fit_transform(df[features])
     
     # Save Scaler for future use during DL model inference
-    os.makedirs("models/shared", exist_ok=True)
-    with open("models/shared/scaler.pkl", "wb") as f:
+    os.makedirs(save_dir, exist_ok=True)
+    with open(f"{save_dir}/scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
-    
+        
     # Reshape data into sequences for DL model
     print("Reshaping data into sequences...")
     num_episodes = SimulationConfig.NUM_EPISODES
     steps_per_episode = SimulationConfig.STEPS_PER_EPISODE
-    num_features = len(features)
     
     # Convert to numpy arrays to facilitate reshaping 
     X_data = np.asarray(df[features].to_numpy(dtype=float))
     y_data = np.asarray(df['label'].to_numpy(dtype=float))
     
     try:
-        X_sequenced = X_data.reshape(num_episodes, steps_per_episode, num_features)
-        y_sequenced = y_data.reshape(num_episodes, steps_per_episode, 1)
+        X_seq = X_data.reshape(num_episodes, steps_per_episode, len(features))
+        y_seq = y_data.reshape(num_episodes, steps_per_episode, 1)
     except ValueError as e:
         print(f"Reshape Error: {e}. Check if total rows ({len(df)}) matches {num_episodes} * {steps_per_episode}.")
         return
 
-    print(f"Data Reshaped: X={X_sequenced.shape}, y={y_sequenced.shape}")
-    
+    print(f"Data Reshaped: X={X_seq.shape}, y={y_seq.shape}")
+
     # Split data into Training (70%), Validation (15%), and Testing (15%)
     print("Splitting data into Training, Validation, and Testing sets...")
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        X_sequenced, y_sequenced, test_size=0.30, random_state=42, shuffle=True
-    )
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=0.50, random_state=42, shuffle=True
-    )
+    X_train, X_temp, y_train, y_temp = train_test_split(X_seq, y_seq, test_size=0.30, random_state=42)
+    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.50, random_state=42)
     
     print(f"Training Sets (70%):   X={X_train.shape}, y={y_train.shape}")
     print(f"Validation Sets (15%): X={X_val.shape},   y={y_val.shape}")
     print(f"Testing Sets (15%):    X={X_test.shape},  y={y_test.shape}")
+
+    # Save .npy files for DL model training
+    np.save(f"{save_dir}/X_train.npy", X_train)
+    np.save(f"{save_dir}/X_val.npy", X_val)   
+    np.save(f"{save_dir}/X_test.npy", X_test)
+    np.save(f"{save_dir}/y_train.npy", y_train)
+    np.save(f"{save_dir}/y_val.npy", y_val)   
+    np.save(f"{save_dir}/y_test.npy", y_test)
     
-    # Save .npy files
-    os.makedirs("data/model_ready", exist_ok=True)
-    np.save("data/model_ready/X_train.npy", X_train)
-    np.save("data/model_ready/X_val.npy", X_val)   
-    np.save("data/model_ready/X_test.npy", X_test)
-    np.save("data/model_ready/y_train.npy", y_train)
-    np.save("data/model_ready/y_val.npy", y_val)   
-    np.save("data/model_ready/y_test.npy", y_test)
+    print(f"✓ {mode} preprocessed dataset saved to {save_dir}/")
+
+def preprocess_data():
+    input_path = SimulationConfig.OUTPUT_FILE
+    df = pd.read_csv(input_path).sort_values(by=['episode_id', 'timestamp'])
+    df = clean_dataset(df)
     
-    print("Processed data saved to data/model_ready/")
+    # Generate both datasets independently!
+    generate_dataset_for_mode(df, 'D2D')
+    generate_dataset_for_mode(df, 'CELLULAR')
 
 if __name__ == "__main__":
     preprocess_data()

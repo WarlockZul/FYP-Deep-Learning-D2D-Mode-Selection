@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import pickle
 
+TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
+
 # Load the processed validation data (X_val and y_val) from data/model_ready/
-def load_validation_data():
-    base_path = "data/model_ready"
+def load_validation_data(mode):
+    base_path = f"data/model_ready/{mode}"
 
     X_val = np.load(os.path.join(base_path, "X_val.npy"))
     y_val = np.load(os.path.join(base_path, "y_val.npy"))
@@ -32,8 +34,8 @@ def create_sliding_windows(X, y, window_size=16):
 # Main Function to Perform Error Analysis for All Models
 def perform_error_analysis():
     # Step 1: Prepare Validation Data, create sliding windows for CNN/DNN, and load all models
-    print("Loading Validation Data...")
-    X_val_raw, y_val_raw = load_validation_data()
+    print(f"Loading Validation Data for {TARGET_MODE.upper()} mode...")
+    X_val_raw, y_val_raw = load_validation_data(TARGET_MODE)
     print("Generating Sliding Windows for CNN/DNN...")
     X_val_win, y_val_win = create_sliding_windows(X_val_raw, y_val_raw, window_size=16)
     models_to_evaluate = ['gru', 'lstm', 'cnn', 'dnn']
@@ -44,10 +46,10 @@ def perform_error_analysis():
     # Step 2: Loop through each model, compute residuals, derive confidence intervals, and save parameters
     for model_name in models_to_evaluate:
         print(f"\n" + "="*40)
-        print(f" ANALYZING MODEL: {model_name.upper()}")
+        print(f" ANALYZING MODEL: {model_name.upper()} ({TARGET_MODE.upper()})")
         print("="*40)
         
-        model_path = f"models/{model_name}/{model_name}_model.keras"
+        model_path = f"models/{TARGET_MODE}/{model_name}/{model_name}_model.keras"
         if not os.path.exists(model_path):
             print(f"⚠️ Warning: Model {model_name.upper()} not found at {model_path}. Skipping.")
             continue
@@ -74,16 +76,19 @@ def perform_error_analysis():
         print(f"CI Width: {upper_bound - lower_bound:.4f} dB")
         
         # Step 2.3: Save Parameters for Threshold Module 
-        # Bandwidth selection chosen: h = 1.0 (0.5 for upper bound and another 0.5 for lower bound)
-        bw_method = 0.5  
+        # NOTE: Refer to proposal
+        bw_method = 1.0  
         error_params = {
             'lower_bound': lower_bound,
             'upper_bound': upper_bound,
             'residuals_data': residuals,
             'bandwidth': bw_method
         }
+
+        save_dir = f"models/{TARGET_MODE}/{model_name}"
+        os.makedirs(save_dir, exist_ok=True)
+        save_path = f"{save_dir}/{model_name}_error_params_kde.pkl"
         
-        save_path = f"models/{model_name}/{model_name}_error_params_kde.pkl"
         with open(save_path, "wb") as f:
             pickle.dump(error_params, f)
         print(f"✓ Saved parameters to '{save_path}'")
@@ -101,10 +106,10 @@ def perform_error_analysis():
     # Step 3: Generate Final Comparison Plot with KDEs and Confidence Intervals for All Models
     if results_dict:
         print("\nGenerating Final Comparison Plot...")
-        plot_model_comparisons(results_dict)
+        plot_model_comparisons(results_dict, TARGET_MODE)
 
 # Function to plot Gaussian KDEs and confidence intervals for all models on the same graph
-def plot_model_comparisons(results_dict):
+def plot_model_comparisons(results_dict, mode):
     plt.figure(figsize=(12, 7))
     colors = {'gru': 'blue', 'lstm': 'green', 'cnn': 'red', 'dnn': 'purple'}
     
@@ -126,15 +131,17 @@ def plot_model_comparisons(results_dict):
                          where=(x_grid >= data['lower']) & (x_grid <= data['upper']), 
                          color=colors[model_name], alpha=0.1)
 
-    plt.title('Error Analysis: 95% Confidence Intervals Across All Models', fontsize=14)
+    plt.title(f'Error Analysis: 95% Confidence Intervals ({mode.upper()} Mode)', fontsize=14)
     plt.xlabel('Prediction Error (True SINR - Predicted SINR) [dB]')
     plt.ylabel('Probability Density')
     plt.xlim(-30, 30) # Zoom in on the relevant area
     plt.legend(loc='upper right')
     plt.grid(True, alpha=0.3)
     
-    os.makedirs("data/results", exist_ok=True)
-    plt.savefig("data/results/error_comparison_all_models.png", dpi=300)
+    # Save the plot dynamically
+    save_dir = f"data/results/{mode}"
+    os.makedirs(save_dir, exist_ok=True)
+    plt.savefig(f"{save_dir}/error_comparison_all_models.png", dpi=300)
     plt.tight_layout()
     plt.show()
 
