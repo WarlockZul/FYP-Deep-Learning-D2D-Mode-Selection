@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import pickle
 
-TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
+TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
 
 # Load the processed validation data (X_val and y_val) from data/model_ready/
 def load_validation_data(mode):

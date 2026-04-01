@@ -83,7 +83,7 @@ if __name__ == "__main__":
     SELECTED_MODEL = 'cnn'       # Options: 'gru', 'lstm', 'cnn', 'dnn'
     CONSTRAINT_TYPE = 'AR'       # Options: 'AR' or 'PCR'
     STARTING_MODE = 'D2D'        # Options: 'D2D' or 'Cellular'
-    TARGET_THROUGHPUT = 15.0     # Target speed in Mbps
+    TARGET_THROUGHPUT = 10.0     # Target speed in Mbps
     # ---------------------
     
     # 1. Initialize the master controller
