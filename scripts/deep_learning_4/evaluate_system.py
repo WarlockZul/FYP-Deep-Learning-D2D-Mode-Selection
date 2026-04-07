@@ -8,18 +8,16 @@ import pandas as pd
 from threshold_selection import ThresholdSelector
 from online_selector import OnlineModeSelector 
 
-# ==========================================
-# HELPER FUNCTIONS
-# ==========================================
+# Function to load the unseen testing dataset for a specific mode (D2D or Cellular).
+# The final 15% of testing data from the 70:15:15 split.
 def load_test_data(mode):
-    """Loads the unseen testing dataset for a specific mode."""
     base_path = f"data/model_ready/{mode}"
     X_test = np.load(os.path.join(base_path, "X_test.npy"))
     y_test = np.load(os.path.join(base_path, "y_test.npy"))
     return X_test, y_test
 
+# Function to format data for CNN/DNN by creating localized timesteps.
 def create_sliding_windows(X, y, window_size=16):
-    """Formats data for CNN/DNN by creating localized timesteps."""
     X_win, y_win = [], []
     for i in range(X.shape[0]):
         for t in range(X.shape[1] - window_size + 1):
@@ -27,8 +25,8 @@ def create_sliding_windows(X, y, window_size=16):
             y_win.append(y[i, t+window_size-1, :])
     return np.array(X_win), np.array(y_win)
 
+# Function to calculate PICP (% inside bounds) and MPIW (width of bounds).
 def calculate_uncertainty_metrics(y_true, y_pred, lower_margin, upper_margin):
-    """Calculates PICP (% inside bounds) and MPIW (width of bounds)."""
     lower_bounds = y_pred + lower_margin
     upper_bounds = y_pred + upper_margin
     within_bounds = (y_true >= lower_bounds) & (y_true <= upper_bounds)
@@ -36,14 +34,15 @@ def calculate_uncertainty_metrics(y_true, y_pred, lower_margin, upper_margin):
     mpiw = upper_margin - lower_margin    
     return picp, mpiw
 
-# ==========================================
-# MAIN EVALUATION FUNCTION
-# ==========================================
+# Main function to evaluate all models across computational, prediction, uncertainty, and system-level metrics. 
+# Results are printed and saved to a CSV file.
 def evaluate_all_models():
-    print("Loading Test Data for both modes...")
+    # Load Test Data for both modes
+    print("\nLoading Test Data for both modes...")
     X_test_d2d_raw, y_test_d2d_raw = load_test_data('d2d')
     X_test_cell_raw, y_test_cell_raw = load_test_data('cellular')
     
+    # Generate sliding windows for CNN/DNN models (which require localized temporal context)
     print("Generating Sliding Windows for CNN/DNN...")
     X_d2d_win, y_d2d_win = create_sliding_windows(X_test_d2d_raw, y_test_d2d_raw)
     X_cell_win, y_cell_win = create_sliding_windows(X_test_cell_raw, y_test_cell_raw)
@@ -51,9 +50,10 @@ def evaluate_all_models():
     models = ['gru', 'lstm', 'cnn', 'dnn']
     results = {}
     
-    # Target parameter based on your supervisor meeting
+    # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
     TEST_TARGET_MBPS = 1.0 
     
+    # Loop through each model
     for model_name in models:
         print(f"\n" + "="*40)
         print(f" EVALUATING MODEL: {model_name.upper()}")
@@ -70,7 +70,7 @@ def evaluate_all_models():
         y_d2d_flat = y_d2d.flatten()
         y_cell_flat = y_cell.flatten()
 
-        # Load the D2D Model for Prediction/Computational Metrics
+        # 2. Load the D2D Model for Prediction/Computational Metrics (SINR Prediction Module)
         path_d2d = f"models/d2d/{model_name}/{model_name}_model.keras"
         if not os.path.exists(path_d2d):
             print(f"⚠️ Skipping {model_name.upper()} - Model not found.")
@@ -78,41 +78,52 @@ def evaluate_all_models():
             
         model = tf.keras.models.load_model(path_d2d)
         
-        # Load Error Params for Uncertainty Metrics
+        # 3. Load Error Params for Uncertainty Metrics (Error Analysis Module)
         with open(f"models/d2d/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
             error_params = pickle.load(f)
 
-        # ==========================================
-        # A. COMPUTATIONAL METRICS (Restored from old file)
-        # ==========================================
+        # Calculate the computational metrics:
+        # - Model Size (number of parameters)
+        # - Inference Time (ms per sample)
+        # - Memory Usage and FLOPs estimate (not included yet)
         start_time = time.time()
         y_pred = model.predict(X_d2d, batch_size=64, verbose=0).flatten()
         inference_time_ms = ((time.time() - start_time) / len(y_d2d_flat)) * 1000
         
-        param_count = model.count_params() # RESTORED
+        param_count = model.count_params() 
 
-        # ==========================================
-        # B. PREDICTION & UNCERTAINTY METRICS (Restored R2)
-        # ==========================================
+        # Calculate the predictions metrics:
+        # - MAE (Mean Absolute Error)
+        # - RMSE (Root Mean Squared Error)
+        # - R2 Score (Coefficient of Determination)
         mae = mean_absolute_error(y_d2d_flat, y_pred)
         rmse = np.sqrt(mean_squared_error(y_d2d_flat, y_pred))
         r2 = r2_score(y_d2d_flat, y_pred) # RESTORED
         
+        # Calculate the uncertainty metrics:
+        # - PICP (Prediction Interval Coverage Probability)
+        # - MPIW (Mean Prediction Interval Width)
         picp, mpiw = calculate_uncertainty_metrics(
             y_d2d_flat, y_pred, error_params['lower_bound'], error_params['upper_bound']
         )
 
-        # ==========================================
-        # C. SYSTEM-LEVEL METRICS (The Decision Loop)
-        # ==========================================
-        selector = OnlineModeSelector(model_name=model_name, constraint_type='AR', target_tput_mbps=TEST_TARGET_MBPS)
+        # Calculate the system-level metrics:
+        # - Average Throughput (Mbps)
+        # - Spectral Efficiency (bps/Hz)
+        # - Mode switching Rate (switches per 100 seconds or timesteps) (Need to check)
+        # - Average D2D Residence Time (% of time in D2D mode in seconds or timesteps)
+        selector = OnlineModeSelector(
+            model_name=model_name, 
+            constraint_type='AR', 
+            target_tput_mbps=TEST_TARGET_MBPS
+        )
         
         current_mode = 'D2D'
         switches = 0
         d2d_time = 0
         total_throughput_mbps = 0.0
         
-        # We run it across all available timesteps
+        # Run the decision loop across all available timesteps
         test_steps = len(X_d2d)
         
         for t in range(test_steps):
@@ -141,16 +152,14 @@ def evaluate_all_models():
         spectral_efficiency = avg_throughput / (100e6 / 1e6) 
         d2d_ratio = (d2d_time / test_steps) * 100
         
-        # ==========================================
-        # D. SAVE RESULTS
-        # ==========================================
+        # Save all metrics in a structured format for final comparison across models.
         results[model_name] = {
             'MAE (dB)': f"{mae:.2f}", 
             'RMSE': f"{rmse:.2f}", 
-            'R2 Score': f"{r2:.3f}",           # RESTORED
+            'R2 Score': f"{r2:.3f}",           
             'PICP (%)': f"{picp:.1f}", 
             'MPIW (dB)': f"{mpiw:.2f}",
-            'Params': param_count,             # RESTORED
+            'Params': param_count,             
             'Inference (ms)': f"{inference_time_ms:.2f}",
             'Avg Tput (Mbps)': f"{avg_throughput:.2f}",
             'Spectral Eff (bps/Hz)': f"{spectral_efficiency:.4f}",
