@@ -8,11 +8,12 @@ from tensorflow.keras.layers import Dense, Dropout, BatchNormalization, Flatten 
 from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource]
+from ml_config import MLConfig
 
 TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
 
 # Function to ensure deterministic/constant outputs for every run
-def set_seeds(seed_value=42):
+def set_seeds(seed_value=MLConfig.RANDOM_SEED):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
     random.seed(seed_value)
     np.random.seed(seed_value)
@@ -22,7 +23,7 @@ def set_seeds(seed_value=42):
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 # Call the function immediately
-set_seeds(42)
+set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
 def load_processed_data(mode):
@@ -41,7 +42,7 @@ def load_processed_data(mode):
 
 # Create sliding windows for CNN/DNN input to predict one step at a time from the 300-second sequences
 # Converts (Episodes, 300, Features) into (Total_Windows, Window_Size, Features)
-def create_sliding_windows(X, y, window_size=16):
+def create_sliding_windows(X, y, window_size=MLConfig.WINDOW_SIZE):
     X_win, y_win = [], []
     for i in range(X.shape[0]):
 
@@ -62,7 +63,7 @@ def build_dnn_model(input_shape):
     - 3 Fully Connected Layers (256 -> 128 -> 64)
     - ReLU Activation
     """
-    reg_val = 0.00001
+    reg_val = MLConfig.L2_REGULARIZATION
     
     model = Sequential([
         # RESTORED: Flatten the 2D window into a 1D vector
@@ -71,24 +72,24 @@ def build_dnn_model(input_shape):
         # Layer 1: Dense Feed-Forward (256 Neurons)
         Dense(256, activation='relu'),
         BatchNormalization(), 
-        Dropout(0.2),        
+        Dropout(MLConfig.DROPOUT_RATE),        
         
         # Layer 2: Dense Feed-Forward (128 Neurons)
         Dense(128, activation='relu'),
         BatchNormalization(),
-        Dropout(0.2),
+        Dropout(MLConfig.DROPOUT_RATE),
         
         # Layer 3: Dense Feed-Forward (64 Neurons)
         Dense(64, activation='relu'),
         BatchNormalization(),
-        Dropout(0.2),
+        Dropout(MLConfig.DROPOUT_RATE),
         
         # Output Layer
         Dense(1, activation='linear', kernel_regularizer=l2(reg_val))
     ])
     
     model.compile(
-        optimizer=Adam(learning_rate=0.001), 
+        optimizer=Adam(learning_rate=MLConfig.LEARNING_RATE),
         loss='mse', 
         metrics=['mae']
     )
@@ -99,8 +100,8 @@ def main():
     X_train_raw, y_train_raw, X_val_raw, y_val_raw = load_processed_data(TARGET_MODE)
     
     print("\nReformatting data into sliding windows...")
-    X_train, y_train = create_sliding_windows(X_train_raw, y_train_raw, window_size=16)
-    X_val, y_val = create_sliding_windows(X_val_raw, y_val_raw, window_size=16)
+    X_train, y_train = create_sliding_windows(X_train_raw, y_train_raw, window_size=MLConfig.WINDOW_SIZE)
+    X_val, y_val = create_sliding_windows(X_val_raw, y_val_raw, window_size=MLConfig.WINDOW_SIZE)
     
     print(f"Windowed Train Data: X={X_train.shape}, y={y_train.shape}")
     
@@ -112,7 +113,7 @@ def main():
     save_dir = f"models/{TARGET_MODE}/dnn"
     os.makedirs(save_dir, exist_ok=True)
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True),
+        EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
         ModelCheckpoint(f"{save_dir}/dnn_model.keras", monitor='val_mae', save_best_only=True),
         CSVLogger(f"{save_dir}/dnn_training_log.csv", separator=',', append=False)
     ]
@@ -121,8 +122,8 @@ def main():
     history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
-        epochs=50,          
-        batch_size=64,      
+        epochs=MLConfig.EPOCHS,
+        batch_size=MLConfig.BATCH_SIZE,    
         callbacks=callbacks,
         verbose=1
     )
@@ -144,6 +145,7 @@ def plot_training_history(history, mode):
     plt.plot(epochs, val_mae, 'ro-', label='Validation MAE')
     plt.title(f'{mode.upper()} Model: Mean Absolute Error')
     plt.ylabel('Error (dB)')
+    plt.xlabel('Epochs')
     plt.legend()
     
     plt.subplot(1, 2, 2)

@@ -3,11 +3,12 @@ import numpy as np
 import pickle
 import tensorflow as tf
 from threshold_selection import ThresholdSelector
+from ml_config import MLConfig
 
 class OnlineModeSelector:
     # Initialize the selector with the chosen model and constraint type.
     # NOTE: This workflow only uses models that are trained in D2D mode only. 
-    def __init__(self, model_name='cnn', constraint_type='AR', target_tput_mbps=10.0):
+    def __init__(self, model_name='cnn', constraint_type=MLConfig.CONSTRAINT_TYPE, target_tput_mbps=MLConfig.TARGET_THROUGHPUT_MBPS):
         self.model_name = model_name
         self.constraint_type = constraint_type
         
@@ -29,11 +30,11 @@ class OnlineModeSelector:
         
         # Calculate the specific margin (buffer) once based on the chosen constraint type and the residuals from the error analysis module.
         if self.constraint_type == 'AR':
-            self.margin_d2d = self.ts.get_ar_margin(res_d2d, epsilon=0.7)
-            self.margin_cell = self.ts.get_ar_margin(res_cell, epsilon=0.7)
+            self.margin_d2d = self.ts.get_ar_margin(res_d2d, epsilon=MLConfig.AR_EPSILON)
+            self.margin_cell = self.ts.get_ar_margin(res_cell, epsilon=MLConfig.AR_EPSILON)
         elif self.constraint_type == 'PCR':
-            self.margin_d2d = self.ts.get_pcr_margin(res_d2d, xi=0.05, confidence=0.95)
-            self.margin_cell = self.ts.get_pcr_margin(res_cell, xi=0.05, confidence=0.95)
+            self.margin_d2d = self.ts.get_pcr_margin(res_d2d, xi=MLConfig.PCR_XI, confidence=MLConfig.PCR_CONFIDENCE)
+            self.margin_cell = self.ts.get_pcr_margin(res_cell, xi=MLConfig.PCR_XI, confidence=MLConfig.PCR_CONFIDENCE)
         else:
             self.margin_d2d, self.margin_cell = 0.0, 0.0
 
@@ -79,16 +80,10 @@ class OnlineModeSelector:
 # Function to test run the online selector with dummy data
 if __name__ == "__main__":
     SELECTED_MODEL = 'cnn'       # Options: 'gru', 'lstm', 'cnn', 'dnn'
-    CONSTRAINT_TYPE = 'AR'       # Options: 'AR' or 'PCR'
     STARTING_MODE = 'D2D'        # Options: 'D2D' or 'Cellular'
-    TARGET_THROUGHPUT = 10.0     # Target speed in Mbps
     
     # Initialize the master controller
-    selector = OnlineModeSelector(
-        model_name=SELECTED_MODEL, 
-        constraint_type=CONSTRAINT_TYPE, 
-        target_tput_mbps=TARGET_THROUGHPUT
-    )
+    selector = OnlineModeSelector(model_name=SELECTED_MODEL)
     
     # Dummy data arrays (Shape depends on model: (1, 16, 20) for CNN/DNN, (1, 300, 20) for GRU/LSTM)
     # CNN/DNN: (1, 16, 20) -> 1 sample, 16 window steps, 20 features
@@ -99,6 +94,10 @@ if __name__ == "__main__":
     else:
         dummy_d2d = np.zeros((1, 300, 20))
         dummy_cell = np.zeros((1, 300, 20))
+
+    # # Dummy predictions (e.g., the AI predicts 5.0 dB for D2D and 10.0 dB for Cellular)
+    # dummy_pred_d2d = 5.0
+    # dummy_pred_cell = 10.0
         
     print(f"--- Simulating 1 Timestep ---")
     print(f"Starting Mode: {STARTING_MODE}")

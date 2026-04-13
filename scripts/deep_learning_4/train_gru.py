@@ -8,11 +8,12 @@ from tensorflow.keras.layers import GRU, Dense, Dropout, BatchNormalization # py
 from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource, reportMissingImports]
+from ml_config import MLConfig
 
 TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
 
 # Function to ensure deterministic/constant outputs for every run
-def set_seeds(seed_value=42):
+def set_seeds(seed_value=MLConfig.RANDOM_SEED):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
     random.seed(seed_value)
     np.random.seed(seed_value)
@@ -22,7 +23,7 @@ def set_seeds(seed_value=42):
     os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 # Call the function immediately
-set_seeds(42)
+set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
 def load_processed_data(mode):
@@ -48,18 +49,18 @@ def build_gru_model(input_shape):
     - Dropout 0.2
     """
     # L2 Regularization value
-    reg_val = 0.00001
+    reg_val = MLConfig.L2_REGULARIZATION
     
     model = Sequential([
         # Layer 1: GRU
         GRU(64, input_shape=input_shape, return_sequences=True),
         BatchNormalization(), 
-        Dropout(0.2),         
+        Dropout(MLConfig.DROPOUT_RATE),
         
         # Layer 2: GRU
         GRU(64, return_sequences=True),
         BatchNormalization(),
-        Dropout(0.2),
+        Dropout(MLConfig.DROPOUT_RATE),
         
         # Output Layer
         Dense(1, activation='linear', kernel_regularizer=l2(reg_val))
@@ -67,7 +68,7 @@ def build_gru_model(input_shape):
     
     # Compile the model by defining optimizer, loss function, and metrics
     model.compile(
-        optimizer=Adam(learning_rate=0.001),
+        optimizer=Adam(learning_rate=MLConfig.LEARNING_RATE),
         loss='mse',  
         metrics=['mae'] 
     )
@@ -92,7 +93,7 @@ def main():
     save_dir = f"models/{TARGET_MODE}/gru"
     os.makedirs(save_dir, exist_ok=True)
     callbacks = [
-        EarlyStopping(monitor='val_loss', patience=8, restore_best_weights=True),
+        EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
         ModelCheckpoint(f"{save_dir}/gru_model.keras", monitor='val_mae', save_best_only=True),
         CSVLogger(f"{save_dir}/gru_training_log.csv", separator=',', append=False)
     ]
@@ -102,8 +103,8 @@ def main():
     history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
-        epochs=50,          
-        batch_size=64,      
+        epochs=MLConfig.EPOCHS,
+        batch_size=MLConfig.BATCH_SIZE,   
         callbacks=callbacks,
         verbose=1
     )
@@ -128,6 +129,7 @@ def plot_training_history(history, mode):
     plt.plot(epochs, val_mae, 'ro-', label='Validation MAE')
     plt.title(f'{mode.upper()} Model: Mean Absolute Error')
     plt.ylabel('Error (dB)')
+    plt.xlabel('Epochs')
     plt.legend()
     
     # Plot MSE of Loss (dB) vs Epochs

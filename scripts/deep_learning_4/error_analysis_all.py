@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+from ml_config import MLConfig
 import pickle
 
 TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
@@ -37,7 +38,7 @@ def perform_error_analysis():
     print(f"Loading Validation Data for {TARGET_MODE.upper()} mode...")
     X_val_raw, y_val_raw = load_validation_data(TARGET_MODE)
     print("Generating Sliding Windows for CNN/DNN...")
-    X_val_win, y_val_win = create_sliding_windows(X_val_raw, y_val_raw, window_size=16)
+    X_val_win, y_val_win = create_sliding_windows(X_val_raw, y_val_raw, window_size=MLConfig.WINDOW_SIZE)
     models_to_evaluate = ['gru', 'lstm', 'cnn', 'dnn']
     
     # Dictionary to store results for the final comparison plot
@@ -68,8 +69,8 @@ def perform_error_analysis():
         residuals = (y_val.flatten() - y_pred.flatten())
         
         # Step 2.2: Derive 95% Confidence Intervals
-        lower_bound = np.percentile(residuals, 2.5)
-        upper_bound = np.percentile(residuals, 97.5)
+        lower_bound = np.percentile(residuals, MLConfig.CI_LOWER_PCT)
+        upper_bound = np.percentile(residuals, MLConfig.CI_UPPER_PCT)
         
         print(f"Mean Residual: {np.mean(residuals):.4f} dB")
         print(f"95% CI: [{lower_bound:.4f} dB, {upper_bound:.4f} dB]")
@@ -116,9 +117,8 @@ def plot_model_comparisons(results_dict, mode):
     for model_name, data in results_dict.items():
         residuals = data['residuals']
         
-        # Fit KDE
-        # NOTE: Edit bandwith selection (h = 1.0) here
-        kde = gaussian_kde(residuals, bw_method=1.0) 
+        # Fit KDE to the residuals
+        kde = gaussian_kde(residuals, bw_method=MLConfig.KDE_BANDWIDTH) 
         x_grid = np.linspace(-40, 40, 1000) # Fixed x-axis for fair visual comparison
         pdf_values = kde(x_grid)
         

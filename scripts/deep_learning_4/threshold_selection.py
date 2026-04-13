@@ -1,9 +1,10 @@
 import numpy as np
 from scipy.stats import beta
+from ml_config import MLConfig
 
 class ThresholdSelector:
     # Initialize with the bandwidth in Hz (default 100 MHz as per simulator configuration)
-    def __init__(self, bandwidth_hz=100e6):
+    def __init__(self, bandwidth_hz=MLConfig.BANDWIDTH_HZ):
         self.bandwidth_hz = bandwidth_hz
 
     # Converts SINR (dB) to an equivalent throughput (Mbps) using the Shannon formula.
@@ -26,13 +27,13 @@ class ThresholdSelector:
     # AR Constraint Function to find the margin based on historical residuals and a reliability threshold (epsilon).
     # Epsilon is the maximum allowed average switching probability, which translates to a percentile of the error distribution.
     # NOTE: Epsilon set at 0.7 by default from proposal
-    def get_ar_margin(self, residuals, epsilon=0.7):
+    def get_ar_margin(self, residuals, epsilon=MLConfig.AR_EPSILON):
         percentile_target = (1.0 - epsilon) * 100
         return np.percentile(residuals, percentile_target)
 
     # PCR Constraint Function to find a stricter margin based on the Beta distribution of residuals and a confidence level.
     # NOTE: xi set at 0.05 and confidence at 0.95 by default from proposal
-    def get_pcr_margin(self, residuals, xi=0.05, confidence=0.95):
+    def get_pcr_margin(self, residuals, xi=MLConfig.PCR_XI, confidence=MLConfig.PCR_CONFIDENCE):
         n = len(residuals)
         sorted_res = np.sort(residuals)
         

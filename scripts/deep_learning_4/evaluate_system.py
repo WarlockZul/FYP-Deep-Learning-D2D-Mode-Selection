@@ -7,6 +7,7 @@ import pickle
 import pandas as pd
 from threshold_selection import ThresholdSelector
 from online_selector import OnlineModeSelector 
+from ml_config import MLConfig
 
 # Function to load the unseen testing dataset for a specific mode (D2D or Cellular).
 # The final 15% of testing data from the 70:15:15 split.
@@ -17,7 +18,7 @@ def load_test_data(mode):
     return X_test, y_test
 
 # Function to format data for CNN/DNN by creating localized timesteps while keeping them grouped by episode
-def create_sliding_windows_per_episode(X, y, window_size=16):
+def create_sliding_windows_per_episode(X, y, window_size=MLConfig.WINDOW_SIZE):
     X_episodes, y_episodes = [], []
     for i in range(X.shape[0]): # Loop through episodes
         X_win, y_win = [], []
@@ -50,11 +51,11 @@ def evaluate_all_models():
     X_d2d_win, y_d2d_win = create_sliding_windows_per_episode(X_test_d2d_raw, y_test_d2d_raw)
     X_cell_win, y_cell_win = create_sliding_windows_per_episode(X_test_cell_raw, y_test_cell_raw)
     
-    models = ['gru', 'lstm', 'cnn', 'dnn']
+    models = MLConfig.MODELS_TO_EVALUATE
     results = {}
     
     # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
-    TEST_TARGET_MBPS = 2.0 
+    TEST_TARGET_MBPS = MLConfig.TARGET_THROUGHPUT_MBPS
     
     # Loop through each model
     for model_name in models:
@@ -151,7 +152,7 @@ def evaluate_all_models():
         # - Average D2D Residence Time (% of time in D2D mode in seconds or timesteps)
         selector = OnlineModeSelector(
             model_name=model_name, 
-            constraint_type='AR', 
+            constraint_type=MLConfig.CONSTRAINT_TYPE, 
             target_tput_mbps=TEST_TARGET_MBPS
         )
         
