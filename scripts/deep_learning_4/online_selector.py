@@ -14,13 +14,6 @@ class OnlineModeSelector:
         # Initialize parameters
         print(f"Initializing Online Mode Selector ({model_name.upper()} model | {constraint_type} constraint)")
         
-        # Load the trained DL Model (specifically the weights and architecture)
-        path_d2d = f"models/d2d/{model_name}/{model_name}_model.keras"
-        path_cell = f"models/cellular/{model_name}/{model_name}_model.keras"
-        
-        self.model_d2d = tf.keras.models.load_model(path_d2d)
-        self.model_cell = tf.keras.models.load_model(path_cell)
-        
         # Load Error Parameters (specifically the residuals for margin calculation)
         with open(f"models/d2d/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
             res_d2d = pickle.load(f)['residuals_data']
@@ -46,29 +39,24 @@ class OnlineModeSelector:
 
         print(f"Target Throughput: {target_tput_mbps} Mbps requires base SINR of {self.base_threshold_db:.2f} dB")
         print(f"Safety Margins Applied -> D2D: {self.margin_d2d:.2f} dB | Cellular: {self.margin_cell:.2f} dB\n")
-
-    # Executes the flowchart logic (from the research paper) to decide whether to switch modes based on the current features and mode.
-    def make_decision(self, feature_d2d, feature_cell, current_mode):
+    
+    # Executes the flowchart logic using PRE-CALCULATED predictions.
+    def make_decision(self, pred_d2d, pred_cell, current_mode):
         new_mode = current_mode
 
         if current_mode == 'D2D':
-            # Step 1: Predict SINR in D2D Mode
-            raw_pred = self.model_d2d.predict(feature_d2d, verbose=0)[0][0]
-
-            # Step 2: Confidence Bound Correction
-            corrected_pred = self.ts.get_corrected_sinr(raw_pred, self.margin_d2d)
+            # Step 2: Confidence Bound Correction (Step 1 is now done outside)
+            corrected_pred = self.ts.get_corrected_sinr(pred_d2d, self.margin_d2d)
             
             # Step 3: Flowchart Logic: If D2D prediction falls below threshold, switch to Cellular.
             if corrected_pred < self.base_threshold_db:
                 new_mode = 'Cellular'
             else:
                 new_mode = 'D2D'
+                
         elif current_mode == 'Cellular':
-            # Step 1: Predict SINR in Cellular Mode
-            raw_pred = self.model_cell.predict(feature_cell, verbose=0)[0][0]
-
             # Step 2: Confidence Bound Correction
-            corrected_pred = self.ts.get_corrected_sinr(raw_pred, self.margin_cell)
+            corrected_pred = self.ts.get_corrected_sinr(pred_cell, self.margin_cell)
             
             # Step 3: Flowchart Logic: If Cellular prediction falls below threshold, switch to D2D.
             if corrected_pred < self.base_threshold_db:
@@ -76,9 +64,9 @@ class OnlineModeSelector:
             else:
                 new_mode = 'Cellular'
         
-        # Return the logs of simulation parameters (predicted & corrected SINR, threshold used, old & new mode)
+        # Return the logs
         log_data = {
-            'predicted_sinr': raw_pred,
+            'predicted_sinr': pred_d2d if current_mode == 'D2D' else pred_cell,
             'corrected_sinr': corrected_pred,
             'threshold_used': self.base_threshold_db,
             'old_mode': current_mode,

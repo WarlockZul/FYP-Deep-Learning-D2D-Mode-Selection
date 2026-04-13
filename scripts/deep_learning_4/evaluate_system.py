@@ -16,14 +16,17 @@ def load_test_data(mode):
     y_test = np.load(os.path.join(base_path, "y_test.npy"))
     return X_test, y_test
 
-# Function to format data for CNN/DNN by creating localized timesteps.
-def create_sliding_windows(X, y, window_size=16):
-    X_win, y_win = [], []
-    for i in range(X.shape[0]):
-        for t in range(X.shape[1] - window_size + 1):
+# Function to format data for CNN/DNN by creating localized timesteps while keeping them grouped by episode
+def create_sliding_windows_per_episode(X, y, window_size=16):
+    X_episodes, y_episodes = [], []
+    for i in range(X.shape[0]): # Loop through episodes
+        X_win, y_win = [], []
+        for t in range(X.shape[1] - window_size + 1): # Loop through timesteps
             X_win.append(X[i, t:t+window_size, :])
             y_win.append(y[i, t+window_size-1, :])
-    return np.array(X_win), np.array(y_win)
+        X_episodes.append(X_win)
+        y_episodes.append(y_win)
+    return np.array(X_episodes), np.array(y_episodes)
 
 # Function to calculate PICP (% inside bounds) and MPIW (width of bounds).
 def calculate_uncertainty_metrics(y_true, y_pred, lower_margin, upper_margin):
@@ -44,14 +47,14 @@ def evaluate_all_models():
     
     # Generate sliding windows for CNN/DNN models (which require localized temporal context)
     print("Generating Sliding Windows for CNN/DNN...")
-    X_d2d_win, y_d2d_win = create_sliding_windows(X_test_d2d_raw, y_test_d2d_raw)
-    X_cell_win, y_cell_win = create_sliding_windows(X_test_cell_raw, y_test_cell_raw)
+    X_d2d_win, y_d2d_win = create_sliding_windows_per_episode(X_test_d2d_raw, y_test_d2d_raw)
+    X_cell_win, y_cell_win = create_sliding_windows_per_episode(X_test_cell_raw, y_test_cell_raw)
     
     models = ['gru', 'lstm', 'cnn', 'dnn']
     results = {}
     
     # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
-    TEST_TARGET_MBPS = 1.0 
+    TEST_TARGET_MBPS = 2.0 
     
     # Loop through each model
     for model_name in models:
@@ -70,13 +73,18 @@ def evaluate_all_models():
         y_d2d_flat = y_d2d.flatten()
         y_cell_flat = y_cell.flatten()
 
-        # 2. Load the D2D Model for Prediction/Computational Metrics (SINR Prediction Module)
+        # 2. Load the D2D and Cellular Models for Prediction/Computational Metrics (SINR Prediction Module)
         path_d2d = f"models/d2d/{model_name}/{model_name}_model.keras"
+        path_cell = f"models/cellular/{model_name}/{model_name}_model.keras"
         if not os.path.exists(path_d2d):
-            print(f"⚠️ Skipping {model_name.upper()} - Model not found.")
+            print(f"⚠️ Skipping {model_name.upper()} - D2D model not found.")
+            continue
+        if not os.path.exists(path_cell):
+            print(f"⚠️ Skipping {model_name.upper()} - Cellular model not found.")
             continue
             
         model = tf.keras.models.load_model(path_d2d)
+        model_cell = tf.keras.models.load_model(path_cell)
         
         # 3. Load Error Params for Uncertainty Metrics (Error Analysis Module)
         with open(f"models/d2d/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
@@ -85,26 +93,55 @@ def evaluate_all_models():
         # Calculate the computational metrics:
         # - Model Size (number of parameters)
         # - Inference Time (ms per sample)
-        # - Memory Usage and FLOPs estimate (not included yet)
+        # - Memory Usage and FLOPs estimate
         start_time = time.time()
-        y_pred = model.predict(X_d2d, batch_size=64, verbose=0).flatten()
-        inference_time_ms = ((time.time() - start_time) / len(y_d2d_flat)) * 1000
         
+        if model_name in ['gru', 'lstm']:
+            # GRU/LSTM are already in the correct 3D shape: (Episodes, Timesteps, Features)
+            preds_d2d = model.predict(X_d2d, batch_size=64, verbose=0)
+            preds_cell = model_cell.predict(X_cell, batch_size=64, verbose=0)
+            
+            # Flatten to 1D array for error calculations
+            preds_d2d_flat = preds_d2d.flatten()
+            
+        else:
+            # CNN/DNN are in 4D shape: (Episodes, Windows, WindowSize, Features)
+            # Flatten to 3D for Keras: (Total_Windows, WindowSize, Features)
+            X_d2d_batch = X_d2d.reshape(-1, X_d2d.shape[2], X_d2d.shape[3])
+            X_cell_batch = X_cell.reshape(-1, X_cell.shape[2], X_cell.shape[3])
+            
+            # Predict
+            preds_d2d_raw = model.predict(X_d2d_batch, batch_size=64, verbose=0)
+            preds_cell_raw = model_cell.predict(X_cell_batch, batch_size=64, verbose=0)
+            
+            # Reshape back to episodic format: (Episodes, Windows, 1)
+            preds_d2d = preds_d2d_raw.reshape(X_d2d.shape[0], X_d2d.shape[1], 1)
+            preds_cell = preds_cell_raw.reshape(X_cell.shape[0], X_cell.shape[1], 1)
+            
+            # Flatten to 1D array for error calculations
+            preds_d2d_flat = preds_d2d_raw.flatten()
+
+        inference_time_ms = ((time.time() - start_time) / len(preds_d2d_flat)) * 1000
+
+        # Float32 uses 4 bytes per parameter, convert to KB for easier interpretation
+        # Basic proxy for Keras FLOPs (1 Multiply + 1 Add per parameter)
         param_count = model.count_params() 
+        memory_usage_kb = (param_count * 4) / 1024.0
+        flops_estimate = param_count * 2
 
         # Calculate the predictions metrics:
         # - MAE (Mean Absolute Error)
         # - RMSE (Root Mean Squared Error)
         # - R2 Score (Coefficient of Determination)
-        mae = mean_absolute_error(y_d2d_flat, y_pred)
-        rmse = np.sqrt(mean_squared_error(y_d2d_flat, y_pred))
-        r2 = r2_score(y_d2d_flat, y_pred) # RESTORED
+        mae = mean_absolute_error(y_d2d_flat, preds_d2d_flat)
+        rmse = np.sqrt(mean_squared_error(y_d2d_flat, preds_d2d_flat))
+        r2 = r2_score(y_d2d_flat, preds_d2d_flat) 
         
         # Calculate the uncertainty metrics:
         # - PICP (Prediction Interval Coverage Probability)
         # - MPIW (Mean Prediction Interval Width)
         picp, mpiw = calculate_uncertainty_metrics(
-            y_d2d_flat, y_pred, error_params['lower_bound'], error_params['upper_bound']
+            y_d2d_flat, preds_d2d_flat, error_params['lower_bound'], error_params['upper_bound']
         )
 
         # Calculate the system-level metrics:
@@ -118,39 +155,47 @@ def evaluate_all_models():
             target_tput_mbps=TEST_TARGET_MBPS
         )
         
-        current_mode = 'D2D'
         switches = 0
         d2d_time = 0
         total_throughput_mbps = 0.0
-        
-        # Run the decision loop across all available timesteps
-        test_steps = len(X_d2d)
-        
-        for t in range(test_steps):
-            feat_d2d = X_d2d[t:t+1]
-            feat_cell = X_cell[t:t+1]
+        d2d_sessions = 0
+        total_steps = X_d2d.shape[0] * X_d2d.shape[1]
+
+        # Loop through each episode
+        for e in range(X_d2d.shape[0]):
+            current_mode = 'D2D' # Reset to D2D at the start of every new episode
+            d2d_sessions += 1
             
-            true_sinr_d2d = y_d2d_flat[t]
-            true_sinr_cell = y_cell_flat[t]
-            
-            new_mode, logs = selector.make_decision(feat_d2d, feat_cell, current_mode)
-            
-            if new_mode != current_mode:
-                switches += 1
-            current_mode = new_mode
-            
-            if current_mode == 'D2D':
-                d2d_time += 1
-                actual_tput = selector.ts.shannon_throughput(true_sinr_d2d)
-            else:
-                actual_tput = selector.ts.shannon_throughput(true_sinr_cell)
+            # Loop through each timestep within the episode
+            for t in range(X_d2d.shape[1]):
+                true_sinr_d2d = y_d2d[e, t, 0]
+                true_sinr_cell = y_cell[e, t, 0]
                 
-            total_throughput_mbps += actual_tput
-            
-        avg_throughput = total_throughput_mbps / test_steps
-        switch_rate = (switches / test_steps) * 100 
+                # Fetch the pre-calculated predictions
+                pred_d2d = preds_d2d[e, t, 0]
+                pred_cell = preds_cell[e, t, 0]
+                
+                # Pass predictions instead of features
+                new_mode, logs = selector.make_decision(pred_d2d, pred_cell, current_mode)
+                
+                if new_mode != current_mode:
+                    switches += 1
+                    if new_mode == 'D2D':
+                        d2d_sessions += 1
+                current_mode = new_mode
+                
+                if current_mode == 'D2D':
+                    d2d_time += 1
+                    actual_tput = selector.ts.shannon_throughput(true_sinr_d2d)
+                else:
+                    actual_tput = selector.ts.shannon_throughput(true_sinr_cell)
+                    
+                total_throughput_mbps += actual_tput
+                
+        avg_throughput = total_throughput_mbps / total_steps
+        switch_rate = (switches / total_steps) * 100 
         spectral_efficiency = avg_throughput / (100e6 / 1e6) 
-        d2d_ratio = (d2d_time / test_steps) * 100
+        avg_d2d_residence_s = (d2d_time / d2d_sessions) if d2d_sessions > 0 else 0.0
         
         # Save all metrics in a structured format for final comparison across models.
         results[model_name] = {
@@ -159,17 +204,19 @@ def evaluate_all_models():
             'R2 Score': f"{r2:.3f}",           
             'PICP (%)': f"{picp:.1f}", 
             'MPIW (dB)': f"{mpiw:.2f}",
-            'Params': param_count,             
+            'Params': param_count,
+            'Mem (KB)': f"{memory_usage_kb:.1f}",
+            'FLOPs': flops_estimate,
             'Inference (ms)': f"{inference_time_ms:.2f}",
             'Avg Tput (Mbps)': f"{avg_throughput:.2f}",
             'Spectral Eff (bps/Hz)': f"{spectral_efficiency:.4f}",
             'Switch Rate (%)': f"{switch_rate:.2f}",
-            'Time in D2D (%)': f"{d2d_ratio:.1f}"
+            'Avg D2D Stay (s)': f"{avg_d2d_residence_s:.1f}"
         }
         
-    print("\n" + "="*110)
+    print("\n" + "="*125)
     print(f" FINAL EVALUATION RESULTS (Target: {TEST_TARGET_MBPS} Mbps)")
-    print("="*110)
+    print("="*125)
     df = pd.DataFrame(results).T
     print(df.to_string())
     
