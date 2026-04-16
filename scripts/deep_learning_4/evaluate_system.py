@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import numpy as np
 import tensorflow as tf
@@ -7,6 +8,13 @@ import pickle
 import pandas as pd
 from threshold_selection import ThresholdSelector
 from online_selector import OnlineModeSelector 
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.append(SCRIPTS_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
+
 from ml_config import MLConfig
 
 # Function to load the unseen testing dataset for a specific mode (D2D or Cellular).

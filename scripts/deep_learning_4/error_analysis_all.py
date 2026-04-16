@@ -1,10 +1,18 @@
 import os
 import numpy as np
+import sys
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
-from ml_config import MLConfig
 import pickle
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.append(SCRIPTS_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
+
+from ml_config import MLConfig
 
 TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
 
@@ -131,7 +139,7 @@ def plot_model_comparisons(results_dict, mode):
                          where=(x_grid >= data['lower']) & (x_grid <= data['upper']), 
                          color=colors[model_name], alpha=0.1)
 
-    plt.title(f'Error Analysis: 95% Confidence Intervals ({mode.upper()} Mode)', fontsize=14)
+    plt.title(f'Error Analysis: 95% Confidence Intervals ({mode.capitalize()} Mode)', fontsize=14)
     plt.xlabel('Prediction Error (True SINR - Predicted SINR) [dB]')
     plt.ylabel('Probability Density')
     plt.xlim(-30, 30) # Zoom in on the relevant area

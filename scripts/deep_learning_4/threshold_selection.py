@@ -1,5 +1,14 @@
 import numpy as np
+import os
+import sys
 from scipy.stats import beta
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.append(SCRIPTS_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
+
 from ml_config import MLConfig
 
 class ThresholdSelector:

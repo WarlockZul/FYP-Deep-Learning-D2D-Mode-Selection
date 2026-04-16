@@ -1,5 +1,6 @@
 import os
 import random
+import sys
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -8,9 +9,16 @@ from tensorflow.keras.layers import Conv1D, GlobalAveragePooling1D, Dense, Dropo
 from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource]
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.append(SCRIPTS_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
+
 from ml_config import MLConfig
 
-TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
+TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
 
 # Function to ensure deterministic/constant outputs for every run
 def set_seeds(seed_value=MLConfig.RANDOM_SEED):
@@ -153,6 +161,8 @@ def plot_training_history(history, mode):
     plt.plot(epochs, loss, 'bo-', label='Training Loss')
     plt.plot(epochs, val_loss, 'ro-', label='Validation Loss')
     plt.title(f'{mode.upper()} Model: Mean Squared Error (Loss)')
+    plt.ylabel('Loss')
+    plt.xlabel('Epochs')
     plt.legend()
     
     plt.tight_layout()

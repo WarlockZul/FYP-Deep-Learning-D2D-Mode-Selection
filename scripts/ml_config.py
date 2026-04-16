@@ -5,7 +5,7 @@ class MLConfig:
     RANDOM_SEED = 42
     WINDOW_SIZE = 16          # Timesteps for CNN/DNN sliding windows
     BATCH_SIZE = 64
-    EPOCHS = 50
+    EPOCHS = 100
     LEARNING_RATE = 0.001
     L2_REGULARIZATION = 0.00001
     DROPOUT_RATE = 0.2
