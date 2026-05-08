@@ -10,6 +10,18 @@ from sklearn.model_selection import train_test_split
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from simulator.config import SimulationConfig
+from simulator_paper.config import PaperConfig
+
+DATASET_TYPE = 'PAPER' # Options: 'PAPER' or 'PROPOSAL'
+
+if DATASET_TYPE == 'PAPER':
+    ACTIVE_CONFIG = PaperConfig
+    DATASET_FOLDER = "data/preprocessed_paper"
+    print("Initializing preprocessing for RESEARCH PAPER dataset.")
+else:
+    ACTIVE_CONFIG = SimulationConfig
+    DATASET_FOLDER = "data/preprocessed_proposal"
+    print("Initializing preprocessing for PROPOSAL dataset.")
 
 def clean_dataset(df):
     print("Cleaning Dataset: Handling Infs, NaNs, and Outliers...")
@@ -42,18 +54,18 @@ def clean_dataset(df):
     return df
 
 # Generate separate datasets for D2D and Cellular modes with engineered features and labels
-def generate_dataset_for_mode(df_raw, mode):
+def generate_dataset_for_mode(df_raw, mode, config, folder_name):
     df = df_raw.copy()
-    print(f"\n--- Generating Dataset for {mode.upper()} Mode ---")
+    print(f"\n--- Generating Dataset for {mode.capitalize()} Mode ---")
     
     if mode == 'D2D':
         target_sinr = 'sinr_d2d_db'
         target_tput = 'throughput_d2d_mbps'
-        save_dir = "data/model_ready/d2d"
+        save_dir = f"{folder_name}/d2d"
     else:
         target_sinr = 'sinr_cell_db'
         target_tput = 'throughput_cell_mbps'
-        save_dir = "data/model_ready/cellular"
+        save_dir = f"{folder_name}/cellular"
 
     # Perform Feature Engineering based on mode (D2D or Cellular)
     # - For rolling means & std devs: Window size = 5 timesteps (5 seconds)
@@ -91,7 +103,7 @@ def generate_dataset_for_mode(df_raw, mode):
     df = df.dropna(subset=['label'])
     
     # NOTE: Save intermediate CSV file containing the new features to check it in Excel
-    debug_path = "data/model_ready/feature_engineering_debug.csv"
+    debug_path = f"{folder_name}/feature_engineering_debug.csv"
     os.makedirs(os.path.dirname(debug_path), exist_ok=True)
     df.to_csv(debug_path, index=False)
     print(f"Debug file saved to {debug_path} (Open in Excel to verify features)")
@@ -108,18 +120,19 @@ def generate_dataset_for_mode(df_raw, mode):
         
     # Reshape data into sequences for DL model
     print("Reshaping data into sequences...")
-    num_episodes = SimulationConfig.NUM_EPISODES
-    steps_per_episode = SimulationConfig.STEPS_PER_EPISODE
+    actual_num_episodes = df['episode_id'].nunique()
+    actual_steps_per_episode = len(df) // actual_num_episodes
     
     # Convert to numpy arrays to facilitate reshaping 
     X_data = np.asarray(df[features].to_numpy(dtype=float))
     y_data = np.asarray(df['label'].to_numpy(dtype=float))
     
     try:
-        X_seq = X_data.reshape(num_episodes, steps_per_episode, len(features))
-        y_seq = y_data.reshape(num_episodes, steps_per_episode, 1)
+        X_seq = X_data.reshape(actual_num_episodes, actual_steps_per_episode, len(features))
+        y_seq = y_data.reshape(actual_num_episodes, actual_steps_per_episode, 1)
     except ValueError as e:
-        print(f"Reshape Error: {e}. Check if total rows ({len(df)}) matches {num_episodes} * {steps_per_episode}.")
+        print(f"Reshape Error: {e}. Check your math!")
+        print(f"Calculated Episodes: {actual_num_episodes} | Calculated Steps: {actual_steps_per_episode}")
         return
 
     print(f"Data Reshaped: X={X_seq.shape}, y={y_seq.shape}")
@@ -141,16 +154,16 @@ def generate_dataset_for_mode(df_raw, mode):
     np.save(f"{save_dir}/y_val.npy", y_val)   
     np.save(f"{save_dir}/y_test.npy", y_test)
     
-    print(f"✓ {mode} preprocessed dataset saved to {save_dir}/")
+    print(f"\n✓ {mode} preprocessed dataset saved to {save_dir}/")
 
-def preprocess_data():
-    input_path = SimulationConfig.OUTPUT_FILE
+def preprocess_data(config, folder_name):
+    input_path = config.OUTPUT_FILE
     df = pd.read_csv(input_path).sort_values(by=['episode_id', 'timestamp'])
     df = clean_dataset(df)
     
     # Generate both datasets independently!
-    generate_dataset_for_mode(df, 'D2D')
-    generate_dataset_for_mode(df, 'CELLULAR')
+    generate_dataset_for_mode(df, 'D2D', config, folder_name)
+    generate_dataset_for_mode(df, 'CELLULAR', config, folder_name)
 
 if __name__ == "__main__":
-    preprocess_data()
+    preprocess_data(ACTIVE_CONFIG, DATASET_FOLDER)
