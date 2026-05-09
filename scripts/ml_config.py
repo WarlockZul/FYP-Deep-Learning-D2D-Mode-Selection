@@ -33,6 +33,6 @@ class MLConfig:
     # ==========================================
     # System Evaluation & Online Selector
     # ==========================================
-    TARGET_THROUGHPUT_MBPS = 1.0  # Ablation variable: e.g., 1.0 Mbps or 10.0 Mbps
+    TARGET_THROUGHPUT_MBPS = 1.0  # Ablation variable: 1.0 Mbps or 10.0 Mbps
     CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
     MODELS_TO_EVALUATE = ['gru', 'lstm', 'cnn', 'dnn']

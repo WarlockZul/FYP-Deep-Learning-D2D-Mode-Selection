@@ -15,11 +15,11 @@ class D2DEnvironment:
         self.last_optimal_mode = None
         
         # Initialize the environment immediately
-        self.reset()
+        self.reset(current_episode=0)
         
-    def reset(self):
+    def reset(self, current_episode=0):
         # Increment episode ID for tracking
-        self.episode_id += 1
+        self.episode_id = current_episode
         
         # Reset time step for new episode
         self.time_step = 0
@@ -48,15 +48,15 @@ class D2DEnvironment:
                 break
         
         # Create Interfering Devices with moderate speed (10 to 20 interferers)
-        # NOTE: Number of interferers remain constant during an episode, changes each episode
-        num_interferers = np.random.randint(
-            SimulationConfig.MIN_NUM_INTERFERER, SimulationConfig.MAX_NUM_INTERFERER + 1
-        )
+        # NOTE: Number of interferers remain constant during an episode, changes each episode (20, 40, ..., 120)
+        num_steps = ((SimulationConfig.MAX_NUM_USERS - SimulationConfig.START_NUM_USERS) // SimulationConfig.USER_INCREMENT) + 1
+        cycle_index = self.episode_id % num_steps
+        self.current_num_users = SimulationConfig.START_NUM_USERS + (cycle_index * SimulationConfig.USER_INCREMENT)
 
-        # Create interferers list and set their speed type same as D2D pair for consistency
+        # Create interferers list with the current number of users for this episode, all with the same speed type as the D2D pair
         self.interferers = [
             UserEquipment(f"Int_{i}", speed_type=current_episode_speed) 
-            for i in range(num_interferers)
+            for i in range(self.current_num_users)
         ]
         
         return self._compute_physics_state()
@@ -177,6 +177,9 @@ class D2DEnvironment:
             # Received Signal Powers (dBm)
             "rx_power_d2d_dbm": 10 * np.log10(s_d2d_watts * 1000),
             "rx_power_cell_dbm": 10 * np.log10(s_cellular_watts * 1000),
+
+            # Number of Interferers
+            "num_interferers": self.current_num_users,
             
             # Interference & Noise 
             "interference_dbm": 10 * np.log10(total_interference_watts * 1000) if total_interference_watts > 0 else -174,

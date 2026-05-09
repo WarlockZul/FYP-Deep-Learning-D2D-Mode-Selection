@@ -47,8 +47,9 @@ class SimulationConfig:
     
     # Mobility & Environment Settings
     TIME_STEP_S = 1                 # Delta t = 1s
-    MIN_NUM_INTERFERER = 10         # Min number of interferers per time step
-    MAX_NUM_INTERFERER = 20         # Max number of interferers per time step
+    START_NUM_USERS = 20            # Start with 20 interferers
+    MAX_NUM_USERS = 120             # Peak at 120 interferers
+    USER_INCREMENT = 20             # Increment by 20 per episode
     
     # Speed ranges (m/s)
     SPEED_MODE_PEDESTRIAN = (1, 3)  # Range: 1 to 3 m/s 

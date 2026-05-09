@@ -23,9 +23,7 @@ def generate_dataset():
     # Loop through episodes
     for episode in tqdm(range(SimulationConfig.NUM_EPISODES), desc="Simulating Episodes"):
         # Reset environment for new episode (new positions, new shadowing)
-        initial_state = env.reset()
-        initial_state['episode_id'] = episode
-        all_records.append(initial_state)
+        env.reset(current_episode=episode)
         
         # Loop through time steps in the episode
         for step in range(SimulationConfig.STEPS_PER_EPISODE):
@@ -49,6 +47,7 @@ def generate_dataset():
         'sinr_d2d_db', 'sinr_cell_db',                  # SINR values (D2D and Cellular)
         'interference_dbm', 'noise_dbm',                # Interference and Noise Levels
         'throughput_d2d_mbps', 'throughput_cell_mbps',  # Throughputs (D2D and Cellular)
+        'num_interferers'                               # Number of Interferers
     ]
     
     # FAILSAFE: Add any remaining columns that aren't in the priority list
