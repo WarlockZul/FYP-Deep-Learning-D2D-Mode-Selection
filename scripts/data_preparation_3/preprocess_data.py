@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from simulator.config import SimulationConfig
 from simulator_paper.config import PaperConfig
 
-DATASET_TYPE = 'PAPER' # Options: 'PAPER' or 'PROPOSAL'
+DATASET_TYPE = 'PROPOSAL' # Options: 'PAPER' or 'PROPOSAL'
 
 if DATASET_TYPE == 'PAPER':
     ACTIVE_CONFIG = PaperConfig
@@ -86,6 +86,7 @@ def generate_dataset_for_mode(df_raw, mode, config, folder_name):
     features = [
         target_sinr, target_tput, 
         'distance_tx_rx', 'distance_bs_rx', 'interference_dbm',
+        'num_interferers',
         'sinr_mean_5s', 'sinr_std_5s', 'tput_mean_5s'
     ]
     for lag in lags:

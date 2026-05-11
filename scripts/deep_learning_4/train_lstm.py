@@ -18,8 +18,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
 
 from ml_config import MLConfig
 
-TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
-
 # Function to ensure deterministic/constant outputs for every run
 def set_seeds(seed_value=MLConfig.RANDOM_SEED):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
@@ -34,8 +32,8 @@ def set_seeds(seed_value=MLConfig.RANDOM_SEED):
 set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
-def load_processed_data(mode):
-    base_path = f"data/model_ready/{mode}/"
+def load_processed_data(dataset_folder, mode):
+    base_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode)
     
     X_train = np.load(os.path.join(base_path, "X_train.npy"))
     y_train = np.load(os.path.join(base_path, "y_train.npy"))
@@ -82,39 +80,7 @@ def build_lstm_model(input_shape):
     
     return model
 
-# Main training function
-def main():
-    X_train, y_train, X_val, y_val = load_processed_data(TARGET_MODE)
-    
-    input_shape = (X_train.shape[1], X_train.shape[2]) 
-    
-    # Build the LSTM Model
-    model = build_lstm_model(input_shape)
-    model.summary() 
-    
-    # Set up Callbacks for Training 
-    save_dir = f"models/{TARGET_MODE}/lstm"
-    os.makedirs(save_dir, exist_ok=True)
-    callbacks = [
-        EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
-        ModelCheckpoint(f"{save_dir}/lstm_model.keras", monitor='val_mae', save_best_only=True),
-        CSVLogger(f"{save_dir}/lstm_training_log.csv", separator=',', append=False)
-    ]
-    
-    print("\nStarting LSTM Training...")
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=MLConfig.EPOCHS,
-        batch_size=MLConfig.BATCH_SIZE,     
-        callbacks=callbacks,
-        verbose=1
-    )
-    
-    plot_training_history(history, TARGET_MODE)
-    print(f"\nTraining Complete. Best model saved to '{save_dir}/lstm_model.keras'")
-
-def plot_training_history(history, mode):
+def plot_training_history(history, dataset_folder, mode):
     mae = history.history['mae']
     val_mae = history.history['val_mae']
     loss = history.history['loss']
@@ -141,11 +107,51 @@ def plot_training_history(history, mode):
     
     plt.tight_layout()
 
-    # Save graph dynamically
-    save_dir = f"models/{mode}/lstm"
+    # Save graph dynamically based on dataset (Proposed or Research Paper) and mode (D2D or Cellular)
+    save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "lstm")
     os.makedirs(save_dir, exist_ok=True)
-    plt.savefig(f"{save_dir}/lstm_training_curve.png", dpi=300)
-    plt.show()
+    plt.savefig(os.path.join(save_dir, "lstm_training_curve.png"), dpi=300)
+    plt.close()
+
+# Main training function
+def main():
+    dataset_folder = "preprocessed_proposal" 
+    modes = ['d2d', 'cellular'] 
+
+    for mode in modes:
+        print(f"\n{'='*50}")
+        print(f"🚀 TRAINING LSTM | Dataset: {dataset_folder} | Mode: {mode.upper()}")
+        print(f"{'='*50}")
+
+        X_train, y_train, X_val, y_val = load_processed_data(dataset_folder, mode)
+        
+        input_shape = (X_train.shape[1], X_train.shape[2]) 
+        
+        # Build the LSTM Model
+        model = build_lstm_model(input_shape)
+        model.summary() 
+        
+        # Set up Callbacks for Training
+        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "lstm")
+        os.makedirs(save_dir, exist_ok=True)
+        callbacks = [
+            EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
+            ModelCheckpoint(os.path.join(save_dir, "lstm_model.keras"), monitor='val_mae', save_best_only=True),
+            CSVLogger(os.path.join(save_dir, "lstm_training_log.csv"), separator=',', append=False)
+        ]
+        
+        print("\nStarting LSTM Training...")
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=MLConfig.EPOCHS,
+            batch_size=MLConfig.BATCH_SIZE,     
+            callbacks=callbacks,
+            verbose=1
+        )
+        
+        plot_training_history(history, dataset_folder, mode)
+        print(f"\nTraining Complete. Best model saved to '{save_dir}/lstm_model.keras'")
 
 if __name__ == "__main__":
     main()

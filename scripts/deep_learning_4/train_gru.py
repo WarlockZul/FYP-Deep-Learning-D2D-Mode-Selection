@@ -18,8 +18,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
 
 from ml_config import MLConfig
 
-TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
-
 # Function to ensure deterministic/constant outputs for every run
 def set_seeds(seed_value=MLConfig.RANDOM_SEED):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
@@ -34,15 +32,15 @@ def set_seeds(seed_value=MLConfig.RANDOM_SEED):
 set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
-def load_processed_data(mode):
-    base_path = f"data/model_ready/{mode}/"
+def load_processed_data(dataset_folder, mode):
+    base_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode)
     
     X_train = np.load(os.path.join(base_path, "X_train.npy"))
     y_train = np.load(os.path.join(base_path, "y_train.npy"))
     X_val   = np.load(os.path.join(base_path, "X_val.npy"))
     y_val   = np.load(os.path.join(base_path, "y_val.npy"))
     
-    print(f"Loaded Data:")
+    print(f"Loaded Data from {dataset_folder}/{mode}:")
     print(f"  Train: X={X_train.shape}, y={y_train.shape}")
     print(f"  Val:   X={X_val.shape},   y={y_val.shape}") 
     
@@ -83,46 +81,8 @@ def build_gru_model(input_shape):
     
     return model
 
-# Main training function
-def main():
-    # Load data from processed files
-    X_train, y_train, X_val, y_val = load_processed_data(TARGET_MODE)
-    
-    # Check input shape
-    # shape[1]: Time steps
-    # shape[2]: Features
-    input_shape = (X_train.shape[1], X_train.shape[2]) 
-    
-    # Build the GRU Model
-    model = build_gru_model(input_shape)
-    model.summary() 
-    
-    # Set up Callbacks for Training 
-    save_dir = f"models/{TARGET_MODE}/gru"
-    os.makedirs(save_dir, exist_ok=True)
-    callbacks = [
-        EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
-        ModelCheckpoint(f"{save_dir}/gru_model.keras", monitor='val_mae', save_best_only=True),
-        CSVLogger(f"{save_dir}/gru_training_log.csv", separator=',', append=False)
-    ]
-    
-    # Train the GRU model
-    print("\nStarting Training...")
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=MLConfig.EPOCHS,
-        batch_size=MLConfig.BATCH_SIZE,   
-        callbacks=callbacks,
-        verbose=1
-    )
-    
-    # Plot training history
-    plot_training_history(history, TARGET_MODE)
-    print(f"\nTraining Complete. Best model saved to '{save_dir}/gru_model.keras'")
-
 # Plot accuracy and loss over time (epochs)
-def plot_training_history(history, mode):
+def plot_training_history(history, dataset_folder, mode):
     mae = history.history['mae']
     val_mae = history.history['val_mae']
     loss = history.history['loss']
@@ -151,11 +111,58 @@ def plot_training_history(history, mode):
     
     plt.tight_layout()
     
-    # Save graph dynamically
-    save_dir = f"models/{mode}/gru"
+    # Save graph dynamically based on dataset (Proposed or Research Paper) and mode (D2D or Cellular)
+    save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "gru")
     os.makedirs(save_dir, exist_ok=True)
-    plt.savefig(f"{save_dir}/gru_training_curve.png", dpi=300)
-    plt.show()
+    plt.savefig(os.path.join(save_dir, "gru_training_curve.png"), dpi=300)
+    plt.close()
+
+# Main training function
+def main():
+    datasets = ['preprocessed_paper', 'preprocessed_proposal']
+    modes = ['d2d', 'cellular']
+
+    for dataset_folder in datasets:
+        for mode in modes:
+            print(f"\n{'='*50}")
+            print(f"🚀 TRAINING GRU | Dataset: {dataset_folder} | Mode: {mode.upper()}")
+            print(f"{'='*50}")
+
+            # Load data from processed files
+            X_train, y_train, X_val, y_val = load_processed_data(dataset_folder, mode)
+            
+            # Check input shape
+            # shape[1]: Time steps
+            # shape[2]: Features
+            input_shape = (X_train.shape[1], X_train.shape[2]) 
+            
+            # Build the GRU Model
+            model = build_gru_model(input_shape)
+            model.summary() 
+            
+            # Set up Callbacks for Training 
+            save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "gru")
+            os.makedirs(save_dir, exist_ok=True)
+            callbacks = [   
+                EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
+                ModelCheckpoint(os.path.join(save_dir, "gru_model.keras"), monitor='val_mae', save_best_only=True),
+                CSVLogger(os.path.join(save_dir, "gru_training_log.csv"), separator=',', append=False)
+            ]
+            
+            # Train the GRU model
+            print("\nStarting GRU Training...")
+            history = model.fit(
+                X_train, y_train,
+                validation_data=(X_val, y_val),
+                epochs=MLConfig.EPOCHS,
+                batch_size=MLConfig.BATCH_SIZE,   
+                callbacks=callbacks,
+                verbose=1
+            )
+            
+            # Plot training history
+            plot_training_history(history, dataset_folder, mode)
+            print(f"\nTraining Complete. Best model saved to '{save_dir}/gru_model.keras'")
 
 if __name__ == "__main__":
     main()

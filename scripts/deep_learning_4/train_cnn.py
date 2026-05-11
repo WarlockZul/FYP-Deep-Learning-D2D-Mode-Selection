@@ -18,8 +18,6 @@ PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
 
 from ml_config import MLConfig
 
-TARGET_MODE = 'd2d'  # Options: 'd2d' or 'cellular'
-
 # Function to ensure deterministic/constant outputs for every run
 def set_seeds(seed_value=MLConfig.RANDOM_SEED):
     os.environ['PYTHONHASHSEED'] = str(seed_value)
@@ -34,8 +32,8 @@ def set_seeds(seed_value=MLConfig.RANDOM_SEED):
 set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
-def load_processed_data(mode):
-    base_path = f"data/model_ready/{mode}/"
+def load_processed_data(dataset_folder, mode):
+    base_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode)
     
     X_train = np.load(os.path.join(base_path, "X_train.npy"))
     y_train = np.load(os.path.join(base_path, "y_train.npy"))
@@ -48,8 +46,8 @@ def load_processed_data(mode):
     
     return X_train, y_train, X_val, y_val
 
-# Create sliding windows for CNN/DNN input to predict one step at a time from the 300-second sequences
-# Converts (Episodes, 300, Features) into (Total_Windows, Window_Size, Features)
+# Create sliding windows for CNN/DNN input to predict one step at a time from the timestep(second) sequences
+# Converts (Episodes, Timesteps, Features) into (Total_Windows, Window_Size, Features)
 def create_sliding_windows(X, y, window_size=MLConfig.WINDOW_SIZE):
     X_win, y_win = [], []
     for i in range(X.shape[0]):
@@ -103,44 +101,7 @@ def build_cnn_model(input_shape):
     )
     return model
 
-# Main training function
-def main():
-    X_train_raw, y_train_raw, X_val_raw, y_val_raw = load_processed_data(TARGET_MODE)
-    
-    # Apply Sliding Window (Window Size = 16 seconds)
-    print("\nReformatting data into sliding windows...")
-    X_train, y_train = create_sliding_windows(X_train_raw, y_train_raw, window_size=MLConfig.WINDOW_SIZE)
-    X_val, y_val = create_sliding_windows(X_val_raw, y_val_raw, window_size=MLConfig.WINDOW_SIZE)
-    
-    print(f"Windowed Train Data: X={X_train.shape}, y={y_train.shape}")
-    
-    input_shape = (X_train.shape[1], X_train.shape[2]) 
-    model = build_cnn_model(input_shape)
-    model.summary() 
-    
-    # Set up Callbacks for Training 
-    save_dir = f"models/{TARGET_MODE}/cnn"
-    os.makedirs(save_dir, exist_ok=True)
-    callbacks = [
-        EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
-        ModelCheckpoint(f"{save_dir}/cnn_model.keras", monitor='val_mae', save_best_only=True),
-        CSVLogger(f"{save_dir}/cnn_training_log.csv", separator=',', append=False)
-    ]
-    
-    print("\nStarting CNN Training...")
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=MLConfig.EPOCHS,
-        batch_size=MLConfig.BATCH_SIZE,   
-        callbacks=callbacks,
-        verbose=1
-    )
-    
-    plot_training_history(history, TARGET_MODE)
-    print(f"\nTraining Complete. Best model saved to '{save_dir}/cnn_model.keras'")
-
-def plot_training_history(history, mode):
+def plot_training_history(history, dataset_folder, mode):
     mae = history.history['mae']
     val_mae = history.history['val_mae']
     loss = history.history['loss']
@@ -167,11 +128,56 @@ def plot_training_history(history, mode):
     
     plt.tight_layout()
     
-    # Save graph dynamically
-    save_dir = f"models/{mode}/cnn"
+    # Save graph dynamically based on dataset (Proposed or Research Paper) and mode (D2D or Cellular)
+    save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "cnn")
     os.makedirs(save_dir, exist_ok=True)
-    plt.savefig(f"{save_dir}/cnn_training_curve.png", dpi=300)
-    plt.show()
+    plt.savefig(os.path.join(save_dir, "cnn_training_curve.png"), dpi=300)
+    plt.close()
+
+# Main training function
+def main():
+    dataset_folder = "preprocessed_proposal" 
+    modes = ['d2d', 'cellular'] 
+
+    for mode in modes:
+        print(f"\n{'='*50}")
+        print(f"🚀 TRAINING CNN | Dataset: {dataset_folder} | Mode: {mode.upper()}")
+        print(f"{'='*50}")
+
+        X_train_raw, y_train_raw, X_val_raw, y_val_raw = load_processed_data(dataset_folder, mode)
+        
+        # Apply Sliding Window (Window Size = 16 seconds)
+        print("\nReformatting data into sliding windows...")
+        X_train, y_train = create_sliding_windows(X_train_raw, y_train_raw, window_size=MLConfig.WINDOW_SIZE)
+        X_val, y_val = create_sliding_windows(X_val_raw, y_val_raw, window_size=MLConfig.WINDOW_SIZE)
+        
+        print(f"Windowed Train Data: X={X_train.shape}, y={y_train.shape}")
+        
+        input_shape = (X_train.shape[1], X_train.shape[2]) 
+        model = build_cnn_model(input_shape)
+        model.summary() 
+        
+        # Set up Callbacks for Training 
+        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "cnn")
+        os.makedirs(save_dir, exist_ok=True)
+        callbacks = [
+            EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),
+            ModelCheckpoint(os.path.join(save_dir, "cnn_model.keras"), monitor='val_mae', save_best_only=True),
+            CSVLogger(os.path.join(save_dir, "cnn_training_log.csv"), separator=',', append=False)
+        ]
+        
+        print("\nStarting CNN Training...")
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=MLConfig.EPOCHS,
+            batch_size=MLConfig.BATCH_SIZE,   
+            callbacks=callbacks,
+            verbose=1
+        )
+        
+        plot_training_history(history, dataset_folder, mode)
+        print(f"\nTraining Complete. Best model saved to '{save_dir}/cnn_model.keras'")
 
 if __name__ == "__main__":
     main()
