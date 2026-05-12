@@ -19,8 +19,8 @@ from ml_config import MLConfig
 
 # Function to load the unseen testing dataset for a specific mode (D2D or Cellular).
 # The final 15% of testing data from the 70:15:15 split.
-def load_test_data(mode):
-    base_path = f"data/model_ready/{mode}"
+def load_test_data(dataset_folder, mode):
+    base_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode)
     X_test = np.load(os.path.join(base_path, "X_test.npy"))
     y_test = np.load(os.path.join(base_path, "y_test.npy"))
     return X_test, y_test
@@ -48,17 +48,18 @@ def calculate_uncertainty_metrics(y_true, y_pred, lower_margin, upper_margin):
 
 # Main function to evaluate all models across computational, prediction, uncertainty, and system-level metrics. 
 # Results are printed and saved to a CSV file.
-def evaluate_all_models():
+def evaluate_all_models(dataset_folder):
     # Load Test Data for both modes
-    print("\nLoading Test Data for both modes...")
-    X_test_d2d_raw, y_test_d2d_raw = load_test_data('d2d')
-    X_test_cell_raw, y_test_cell_raw = load_test_data('cellular')
+    print(f"\nLoading Test Data from {dataset_folder}...")
+    X_test_d2d_raw, y_test_d2d_raw = load_test_data(dataset_folder, 'd2d')
+    X_test_cell_raw, y_test_cell_raw = load_test_data(dataset_folder, 'cellular')
     
     # Generate sliding windows for CNN/DNN models (which require localized temporal context)
     print("Generating Sliding Windows for CNN/DNN...")
     X_d2d_win, y_d2d_win = create_sliding_windows_per_episode(X_test_d2d_raw, y_test_d2d_raw)
     X_cell_win, y_cell_win = create_sliding_windows_per_episode(X_test_cell_raw, y_test_cell_raw)
     
+    # Initialize models to evaluate and a dictionary to store results for final comparison
     models = MLConfig.MODELS_TO_EVALUATE
     results = {}
     
@@ -83,8 +84,8 @@ def evaluate_all_models():
         y_cell_flat = y_cell.flatten()
 
         # 2. Load the D2D and Cellular Models for Prediction/Computational Metrics (SINR Prediction Module)
-        path_d2d = f"models/d2d/{model_name}/{model_name}_model.keras"
-        path_cell = f"models/cellular/{model_name}/{model_name}_model.keras"
+        path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, "d2d", model_name, f"{model_name}_model.keras")
+        path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, "cellular", model_name, f"{model_name}_model.keras")
         if not os.path.exists(path_d2d):
             print(f"⚠️ Skipping {model_name.upper()} - D2D model not found.")
             continue
@@ -92,14 +93,19 @@ def evaluate_all_models():
             print(f"⚠️ Skipping {model_name.upper()} - Cellular model not found.")
             continue
             
-        model = tf.keras.models.load_model(path_d2d)
+        model_d2d = tf.keras.models.load_model(path_d2d)
         model_cell = tf.keras.models.load_model(path_cell)
         
         # 3. Load Error Params for Uncertainty Metrics (Error Analysis Module)
-        with open(f"models/d2d/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
-            error_params = pickle.load(f)
+        pkl_path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
+        with open(pkl_path_d2d, "rb") as f:
+            error_params_d2d = pickle.load(f)
+            
+        pkl_path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
+        with open(pkl_path_cell, "rb") as f:
+            error_params_cell = pickle.load(f)
 
-        # Calculate the computational metrics:
+        # A) Calculate the computational metrics:
         # - Model Size (number of parameters)
         # - Inference Time (ms per sample)
         # - Memory Usage and FLOPs estimate
@@ -107,11 +113,12 @@ def evaluate_all_models():
         
         if model_name in ['gru', 'lstm']:
             # GRU/LSTM are already in the correct 3D shape: (Episodes, Timesteps, Features)
-            preds_d2d = model.predict(X_d2d, batch_size=64, verbose=0)
+            preds_d2d = model_d2d.predict(X_d2d, batch_size=64, verbose=0)
             preds_cell = model_cell.predict(X_cell, batch_size=64, verbose=0)
             
             # Flatten to 1D array for error calculations
             preds_d2d_flat = preds_d2d.flatten()
+            preds_cell_flat = preds_cell.flatten()
             
         else:
             # CNN/DNN are in 4D shape: (Episodes, Windows, WindowSize, Features)
@@ -120,7 +127,7 @@ def evaluate_all_models():
             X_cell_batch = X_cell.reshape(-1, X_cell.shape[2], X_cell.shape[3])
             
             # Predict
-            preds_d2d_raw = model.predict(X_d2d_batch, batch_size=64, verbose=0)
+            preds_d2d_raw = model_d2d.predict(X_d2d_batch, batch_size=64, verbose=0)
             preds_cell_raw = model_cell.predict(X_cell_batch, batch_size=64, verbose=0)
             
             # Reshape back to episodic format: (Episodes, Windows, 1)
@@ -129,41 +136,51 @@ def evaluate_all_models():
             
             # Flatten to 1D array for error calculations
             preds_d2d_flat = preds_d2d_raw.flatten()
+            preds_cell_flat = preds_cell_raw.flatten()
 
         inference_time_ms = ((time.time() - start_time) / len(preds_d2d_flat)) * 1000
 
         # Float32 uses 4 bytes per parameter, convert to KB for easier interpretation
         # Basic proxy for Keras FLOPs (1 Multiply + 1 Add per parameter)
-        param_count = model.count_params() 
+        param_count = model_d2d.count_params() 
         memory_usage_kb = (param_count * 4) / 1024.0
         flops_estimate = param_count * 2
 
-        # Calculate the predictions metrics:
+        # B) Calculate the predictions metrics:
         # - MAE (Mean Absolute Error)
         # - RMSE (Root Mean Squared Error)
         # - R2 Score (Coefficient of Determination)
-        mae = mean_absolute_error(y_d2d_flat, preds_d2d_flat)
-        rmse = np.sqrt(mean_squared_error(y_d2d_flat, preds_d2d_flat))
-        r2 = r2_score(y_d2d_flat, preds_d2d_flat) 
+        mae_d2d = mean_absolute_error(y_d2d_flat, preds_d2d_flat)
+        rmse_d2d = np.sqrt(mean_squared_error(y_d2d_flat, preds_d2d_flat))
+        r2_d2d = r2_score(y_d2d_flat, preds_d2d_flat) 
         
-        # Calculate the uncertainty metrics:
+        mae_cell = mean_absolute_error(y_cell_flat, preds_cell_flat)
+        rmse_cell = np.sqrt(mean_squared_error(y_cell_flat, preds_cell_flat))
+        r2_cell = r2_score(y_cell_flat, preds_cell_flat)
+        
+        # C) Calculate the uncertainty metrics:
         # - PICP (Prediction Interval Coverage Probability)
         # - MPIW (Mean Prediction Interval Width)
-        picp, mpiw = calculate_uncertainty_metrics(
-            y_d2d_flat, preds_d2d_flat, error_params['lower_bound'], error_params['upper_bound']
+        picp_d2d, mpiw_d2d = calculate_uncertainty_metrics(
+            y_d2d_flat, preds_d2d_flat, error_params_d2d['lower_bound'], error_params_d2d['upper_bound']
+        )
+        picp_cell, mpiw_cell = calculate_uncertainty_metrics(
+            y_cell_flat, preds_cell_flat, error_params_cell['lower_bound'], error_params_cell['upper_bound']
         )
 
-        # Calculate the system-level metrics:
+        # D) Calculate the system-level metrics:
         # - Average Throughput (Mbps)
         # - Spectral Efficiency (bps/Hz)
         # - Mode switching Rate (switches per 100 seconds or timesteps) (Need to check)
         # - Average D2D Residence Time (% of time in D2D mode in seconds or timesteps)
         selector = OnlineModeSelector(
             model_name=model_name, 
+            dataset_folder=dataset_folder,
             constraint_type=MLConfig.CONSTRAINT_TYPE, 
             target_tput_mbps=TEST_TARGET_MBPS
         )
         
+        # Initialize counters for system-level metrics
         switches = 0
         d2d_time = 0
         total_throughput_mbps = 0.0
@@ -172,7 +189,7 @@ def evaluate_all_models():
 
         # Loop through each episode
         for e in range(X_d2d.shape[0]):
-            current_mode = 'D2D' # Reset to D2D at the start of every new episode
+            current_mode = 'D2D' # Reset to D2D at the start of every new episode (based on research paper)
             d2d_sessions += 1
             
             # Loop through each timestep within the episode
@@ -187,12 +204,13 @@ def evaluate_all_models():
                 # Pass predictions instead of features
                 new_mode, logs = selector.make_decision(pred_d2d, pred_cell, current_mode)
                 
+                # Update switching rate and D2D residence time based on the new mode decision
                 if new_mode != current_mode:
                     switches += 1
                     if new_mode == 'D2D':
                         d2d_sessions += 1
+
                 current_mode = new_mode
-                
                 if current_mode == 'D2D':
                     d2d_time += 1
                     actual_tput = selector.ts.shannon_throughput(true_sinr_d2d)
@@ -201,6 +219,7 @@ def evaluate_all_models():
                     
                 total_throughput_mbps += actual_tput
                 
+        # Finalize calculations for system-level metrics
         avg_throughput = total_throughput_mbps / total_steps
         switch_rate = (switches / total_steps) * 100 
         spectral_efficiency = avg_throughput / (100e6 / 1e6) 
@@ -208,11 +227,16 @@ def evaluate_all_models():
         
         # Save all metrics in a structured format for final comparison across models.
         results[model_name] = {
-            'MAE (dB)': f"{mae:.2f}", 
-            'RMSE': f"{rmse:.2f}", 
-            'R2 Score': f"{r2:.3f}",           
-            'PICP (%)': f"{picp:.1f}", 
-            'MPIW (dB)': f"{mpiw:.2f}",
+            'D2D MAE': f"{mae_d2d:.2f}", 
+            'Cell MAE': f"{mae_cell:.2f}",
+            'D2D RMSE': f"{rmse_d2d:.2f}", 
+            'Cell RMSE': f"{rmse_cell:.2f}",
+            'D2D PICP%': f"{picp_d2d:.1f}", 
+            'Cell PICP%': f"{picp_cell:.1f}",
+            'D2D MPIW (dB)': f"{mpiw_d2d:.2f}",
+            'Cell MPIW (dB)': f"{mpiw_cell:.2f}",
+            'R2 D2D': f"{r2_d2d:.3f}",
+            'R2 Cell': f"{r2_cell:.3f}",
             'Params': param_count,
             'Mem (KB)': f"{memory_usage_kb:.1f}",
             'FLOPs': flops_estimate,
@@ -223,15 +247,28 @@ def evaluate_all_models():
             'Avg D2D Stay (s)': f"{avg_d2d_residence_s:.1f}"
         }
         
-    print("\n" + "="*125)
-    print(f" FINAL EVALUATION RESULTS (Target: {TEST_TARGET_MBPS} Mbps)")
-    print("="*125)
-    df = pd.DataFrame(results).T
-    print(df.to_string())
-    
-    os.makedirs("data/results", exist_ok=True)
-    df.to_csv("data/results/final_evaluation_metrics.csv")
-    print("\n✓ Results saved to data/results/final_evaluation_metrics.csv")
+    if results:
+        print("\n" + "="*100)
+        print(f" FINAL EVALUATION RESULTS: {dataset_folder.upper()} (Target: {TEST_TARGET_MBPS} Mbps)")
+        print("="*100)
+        df = pd.DataFrame(results).T
+        print(df.to_string())
+        
+        # FIX: Save results into the correct dataset-specific results folder
+        save_dir = os.path.join(PROJECT_ROOT, "data", "results", dataset_folder)
+        os.makedirs(save_dir, exist_ok=True)
+        csv_path = os.path.join(save_dir, "final_evaluation_metrics.csv")
+        df.to_csv(csv_path)
+        print(f"\n✓ Results saved to {csv_path}")
+
+# Main execution loop
+def main():
+    datasets = ['preprocessed_paper', 'preprocessed_proposal']
+    for dataset in datasets:
+        print(f"\n\n{'*'*80}")
+        print(f"🚀 INITIATING SYSTEM EVALUATION FOR: {dataset.upper()}")
+        print(f"{'*'*80}")
+        evaluate_all_models(dataset)
 
 if __name__ == "__main__":
-    evaluate_all_models()
+    main()

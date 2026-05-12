@@ -14,11 +14,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
 
 from ml_config import MLConfig
 
-TARGET_MODE = 'cellular'  # Options: 'd2d' or 'cellular'
-
 # Load the processed validation data (X_val and y_val) from data/model_ready/
-def load_validation_data(mode):
-    base_path = f"data/model_ready/{mode}"
+def load_validation_data(dataset_folder, mode):
+    base_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode)
 
     X_val = np.load(os.path.join(base_path, "X_val.npy"))
     y_val = np.load(os.path.join(base_path, "y_val.npy"))
@@ -41,10 +39,10 @@ def create_sliding_windows(X, y, window_size=16):
     return np.array(X_win), np.array(y_win)
 
 # Main Function to Perform Error Analysis for All Models
-def perform_error_analysis():
+def perform_error_analysis(dataset_folder, mode):
     # Step 1: Prepare Validation Data, create sliding windows for CNN/DNN, and load all models
-    print(f"Loading Validation Data for {TARGET_MODE.upper()} mode...")
-    X_val_raw, y_val_raw = load_validation_data(TARGET_MODE)
+    print(f"\nLoading Validation Data for {dataset_folder} | {mode.upper()}...")
+    X_val_raw, y_val_raw = load_validation_data(dataset_folder, mode)
     print("Generating Sliding Windows for CNN/DNN...")
     X_val_win, y_val_win = create_sliding_windows(X_val_raw, y_val_raw, window_size=MLConfig.WINDOW_SIZE)
     models_to_evaluate = ['gru', 'lstm', 'cnn', 'dnn']
@@ -55,12 +53,12 @@ def perform_error_analysis():
     # Step 2: Loop through each model, compute residuals, derive confidence intervals, and save parameters
     for model_name in models_to_evaluate:
         print(f"\n" + "="*40)
-        print(f" ANALYZING MODEL: {model_name.upper()} ({TARGET_MODE.upper()})")
+        print(f"--- ANALYZING MODEL: {model_name.upper()} ---")
         print("="*40)
         
-        model_path = f"models/{TARGET_MODE}/{model_name}/{model_name}_model.keras"
+        model_path = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, model_name, f"{model_name}_model.keras")
         if not os.path.exists(model_path):
-            print(f"⚠️ Warning: Model {model_name.upper()} not found at {model_path}. Skipping.")
+            print(f"⚠️ Warning: Model {model_name.upper()} not found. Skipping (Expected if not trained on this dataset).")
             continue
             
         # Load Model
@@ -94,9 +92,9 @@ def perform_error_analysis():
             'bandwidth': bw_method
         }
 
-        save_dir = f"models/{TARGET_MODE}/{model_name}"
+        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, model_name)
         os.makedirs(save_dir, exist_ok=True)
-        save_path = f"{save_dir}/{model_name}_error_params_kde.pkl"
+        save_path = os.path.join(save_dir, f"{model_name}_error_params_kde.pkl")
         
         with open(save_path, "wb") as f:
             pickle.dump(error_params, f)
@@ -115,10 +113,10 @@ def perform_error_analysis():
     # Step 3: Generate Final Comparison Plot with KDEs and Confidence Intervals for All Models
     if results_dict:
         print("\nGenerating Final Comparison Plot...")
-        plot_model_comparisons(results_dict, TARGET_MODE)
+        plot_model_comparisons(results_dict, dataset_folder, mode)
 
 # Function to plot Gaussian KDEs and confidence intervals for all models on the same graph
-def plot_model_comparisons(results_dict, mode):
+def plot_model_comparisons(results_dict, dataset_folder, mode):
     plt.figure(figsize=(12, 7))
     colors = {'gru': 'blue', 'lstm': 'green', 'cnn': 'red', 'dnn': 'purple'}
     
@@ -146,12 +144,23 @@ def plot_model_comparisons(results_dict, mode):
     plt.legend(loc='upper right')
     plt.grid(True, alpha=0.3)
     
-    # Save the plot dynamically
-    save_dir = f"data/results/{mode}"
+    # Save the plot dynamically based on dataset and mode
+    save_dir = os.path.join(PROJECT_ROOT, "data", "results", dataset_folder, mode)
     os.makedirs(save_dir, exist_ok=True)
-    plt.savefig(f"{save_dir}/error_comparison_all_models.png", dpi=300)
+    plt.savefig(os.path.join(save_dir, "error_comparison_all_models.png"), dpi=300)
     plt.tight_layout()
-    plt.show()
+    plt.close()
+
+def main():
+    datasets = ['preprocessed_paper', 'preprocessed_proposal']
+    modes = ['d2d', 'cellular']
+    
+    for dataset in datasets:
+        for mode in modes:
+            print(f"\n{'='*60}")
+            print(f"🚀 ERROR ANALYSIS | Dataset: {dataset} | Mode: {mode.upper()}")
+            print(f"{'='*60}")
+            perform_error_analysis(dataset, mode)
 
 if __name__ == "__main__":
-    perform_error_analysis()
+    main()

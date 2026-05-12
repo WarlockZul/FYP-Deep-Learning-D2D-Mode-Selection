@@ -16,18 +16,21 @@ from ml_config import MLConfig
 class OnlineModeSelector:
     # Initialize the selector with the chosen model and constraint type.
     # NOTE: This workflow only uses models that are trained in D2D mode only. 
-    def __init__(self, model_name='cnn', constraint_type=MLConfig.CONSTRAINT_TYPE, target_tput_mbps=MLConfig.TARGET_THROUGHPUT_MBPS):
+    def __init__(self, model_name='cnn', dataset_folder='preprocessed_paper', constraint_type=MLConfig.CONSTRAINT_TYPE, target_tput_mbps=MLConfig.TARGET_THROUGHPUT_MBPS):
         self.model_name = model_name
+        self.dataset_folder = dataset_folder
         self.constraint_type = constraint_type
         
         # Initialize parameters
         print(f"Initializing Online Mode Selector ({model_name.upper()} model | {constraint_type} constraint)")
+        d2d_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
+        cell_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
         
         # Load Error Parameters (specifically the residuals for margin calculation)
-        with open(f"models/d2d/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
+        with open(d2d_pkl_path, "rb") as f:
             res_d2d = pickle.load(f)['residuals_data']
             
-        with open(f"models/cellular/{model_name}/{model_name}_error_params_kde.pkl", "rb") as f:
+        with open(cell_pkl_path, "rb") as f:
             res_cell = pickle.load(f)['residuals_data']
         
         # Initialize Threshold Selector
@@ -89,29 +92,20 @@ class OnlineModeSelector:
 if __name__ == "__main__":
     SELECTED_MODEL = 'cnn'       # Options: 'gru', 'lstm', 'cnn', 'dnn'
     STARTING_MODE = 'D2D'        # Options: 'D2D' or 'Cellular'
+    DATASET = 'preprocessed_proposal'
     
     # Initialize the master controller
-    selector = OnlineModeSelector(model_name=SELECTED_MODEL)
-    
-    # Dummy data arrays (Shape depends on model: (1, 16, 20) for CNN/DNN, (1, 300, 20) for GRU/LSTM)
-    # CNN/DNN: (1, 16, 20) -> 1 sample, 16 window steps, 20 features
-    # GRU/LSTM: (1, 300, 20) -> 1 sample, 300 timesteps, 20 features
-    if SELECTED_MODEL in ['cnn', 'dnn']:
-        dummy_d2d = np.zeros((1, 16, 20))
-        dummy_cell = np.zeros((1, 16, 20))
-    else:
-        dummy_d2d = np.zeros((1, 300, 20))
-        dummy_cell = np.zeros((1, 300, 20))
+    selector = OnlineModeSelector(model_name=SELECTED_MODEL, dataset_folder=DATASET)
 
-    # # Dummy predictions (e.g., the AI predicts 5.0 dB for D2D and 10.0 dB for Cellular)
-    # dummy_pred_d2d = 5.0
-    # dummy_pred_cell = 10.0
+    # The make_decision function expects SINR floats (predictions), not massive NumPy arrays
+    dummy_pred_d2d = 5.0
+    dummy_pred_cell = 10.0
         
     print(f"--- Simulating 1 Timestep ---")
     print(f"Starting Mode: {STARTING_MODE}")
     
     # Pass both feature sets into the decision engine
-    final_mode, logs = selector.make_decision(dummy_d2d, dummy_cell, current_mode=STARTING_MODE)
+    final_mode, logs = selector.make_decision(dummy_pred_d2d, dummy_pred_cell, current_mode=STARTING_MODE)
     
     print("\nDecision Output Logs:")
     for key, value in logs.items():
