@@ -84,8 +84,9 @@ def evaluate_all_models(dataset_folder):
         y_cell_flat = y_cell.flatten()
 
         # 2. Load the D2D and Cellular Models for Prediction/Computational Metrics (SINR Prediction Module)
-        path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, "d2d", model_name, f"{model_name}_model.keras")
-        path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, "cellular", model_name, f"{model_name}_model.keras")
+        path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, "d2d", model_name, f"{model_name}_model.keras")
+        path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, "cellular", model_name, f"{model_name}_model.keras")
+        
         if not os.path.exists(path_d2d):
             print(f"⚠️ Skipping {model_name.upper()} - D2D model not found.")
             continue
@@ -97,11 +98,11 @@ def evaluate_all_models(dataset_folder):
         model_cell = tf.keras.models.load_model(path_cell)
         
         # 3. Load Error Params for Uncertainty Metrics (Error Analysis Module)
-        pkl_path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
+        pkl_path_d2d = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
         with open(pkl_path_d2d, "rb") as f:
             error_params_d2d = pickle.load(f)
             
-        pkl_path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
+        pkl_path_cell = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
         with open(pkl_path_cell, "rb") as f:
             error_params_cell = pickle.load(f)
 
@@ -255,7 +256,7 @@ def evaluate_all_models(dataset_folder):
         print(df.to_string())
         
         # FIX: Save results into the correct dataset-specific results folder
-        save_dir = os.path.join(PROJECT_ROOT, "data", "results", dataset_folder)
+        save_dir = os.path.join(PROJECT_ROOT, "results", dataset_folder, MLConfig.EXPERIMENT_NAME)
         os.makedirs(save_dir, exist_ok=True)
         csv_path = os.path.join(save_dir, "final_evaluation_metrics.csv")
         df.to_csv(csv_path)

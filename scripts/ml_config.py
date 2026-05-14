@@ -1,9 +1,11 @@
+import os
+
 class MLConfig:
     # ==========================================
     # SINR Prediction Module (ML Model Hyperparameters)
     # ==========================================
     RANDOM_SEED = 42
-    WINDOW_SIZE = 16          # Timesteps for CNN/DNN sliding windows
+    # WINDOW_SIZE = 16          # Timesteps for CNN/DNN sliding windows
     BATCH_SIZE = 64
     EPOCHS = 100
     LEARNING_RATE = 0.001
@@ -34,5 +36,16 @@ class MLConfig:
     # System Evaluation & Online Selector
     # ==========================================
     TARGET_THROUGHPUT_MBPS = 1.0  # Ablation variable: 1.0 Mbps or 10.0 Mbps
-    CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
+    # CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
     MODELS_TO_EVALUATE = ['gru', 'lstm', 'cnn', 'dnn']
+
+    # ==========================================
+    # Ablation Study Parameters
+    # ==========================================
+
+    WINDOW_SIZE = int(os.environ.get('ML_WINDOW_SIZE', 16))         # Timesteps for CNN/DNN sliding windows
+    CONSTRAINT_TYPE = os.environ.get('ML_CONSTRAINT_TYPE', 'AR')    # 'AR' or 'PCR'
+    USE_KDE = os.environ.get('ML_USE_KDE', 'True') == 'True'        # Whether to apply KDE smoothing in error analysis (True/False)
+
+    # Master Folder Routing
+    EXPERIMENT_NAME = os.environ.get('ML_EXPERIMENT_NAME', 'baseline_proposal')

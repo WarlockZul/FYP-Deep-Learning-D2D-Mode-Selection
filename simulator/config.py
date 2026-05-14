@@ -3,7 +3,7 @@ import numpy as np
 class SimulationConfig:
     # Simulation Settings 
     NUM_EPISODES = 100              # How many separate runs to do
-    STEPS_PER_EPISODE = 300         # Duration of each run (seconds)
+    STEPS_PER_EPISODE = 100         # Duration of each run (seconds)
     D2D_MAX_DIST_M = 400            # Maximum distance to consider D2D pairing feasible
     SEED = 42                       # For reproducibility
     OUTPUT_FILE = "data/raw/simulation_data.csv"

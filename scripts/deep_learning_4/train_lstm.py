@@ -108,7 +108,7 @@ def plot_training_history(history, dataset_folder, mode):
     plt.tight_layout()
 
     # Save graph dynamically based on dataset (Proposed or Research Paper) and mode (D2D or Cellular)
-    save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "lstm")
+    save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, mode, "lstm")
     os.makedirs(save_dir, exist_ok=True)
     plt.savefig(os.path.join(save_dir, "lstm_training_curve.png"), dpi=300)
     plt.close()
@@ -132,7 +132,7 @@ def main():
         model.summary() 
         
         # Set up Callbacks for Training
-        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, "lstm")
+        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, mode, "lstm")
         os.makedirs(save_dir, exist_ok=True)
         callbacks = [
             EarlyStopping(monitor='val_loss', patience=MLConfig.EARLY_STOPPING_PATIENCE, restore_best_weights=True),

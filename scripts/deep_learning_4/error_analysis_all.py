@@ -56,7 +56,7 @@ def perform_error_analysis(dataset_folder, mode):
         print(f"--- ANALYZING MODEL: {model_name.upper()} ---")
         print("="*40)
         
-        model_path = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, model_name, f"{model_name}_model.keras")
+        model_path = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, mode, model_name, f"{model_name}_model.keras")
         if not os.path.exists(model_path):
             print(f"⚠️ Warning: Model {model_name.upper()} not found. Skipping (Expected if not trained on this dataset).")
             continue
@@ -92,7 +92,7 @@ def perform_error_analysis(dataset_folder, mode):
             'bandwidth': bw_method
         }
 
-        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, mode, model_name)
+        save_dir = os.path.join(PROJECT_ROOT, "models", dataset_folder, MLConfig.EXPERIMENT_NAME, mode, model_name)
         os.makedirs(save_dir, exist_ok=True)
         save_path = os.path.join(save_dir, f"{model_name}_error_params_kde.pkl")
         
@@ -145,7 +145,7 @@ def plot_model_comparisons(results_dict, dataset_folder, mode):
     plt.grid(True, alpha=0.3)
     
     # Save the plot dynamically based on dataset and mode
-    save_dir = os.path.join(PROJECT_ROOT, "data", "results", dataset_folder, mode)
+    save_dir = os.path.join(PROJECT_ROOT, "results", dataset_folder, MLConfig.EXPERIMENT_NAME, mode)
     os.makedirs(save_dir, exist_ok=True)
     plt.savefig(os.path.join(save_dir, "error_comparison_all_models.png"), dpi=300)
     plt.tight_layout()

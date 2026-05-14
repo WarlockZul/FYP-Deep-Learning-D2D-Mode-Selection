@@ -23,8 +23,8 @@ class OnlineModeSelector:
         
         # Initialize parameters
         print(f"Initializing Online Mode Selector ({model_name.upper()} model | {constraint_type} constraint)")
-        d2d_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
-        cell_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
+        d2d_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, MLConfig.EXPERIMENT_NAME, "d2d", model_name, f"{model_name}_error_params_kde.pkl")
+        cell_pkl_path = os.path.join(PROJECT_ROOT, "models", self.dataset_folder, MLConfig.EXPERIMENT_NAME, "cellular", model_name, f"{model_name}_error_params_kde.pkl")
         
         # Load Error Parameters (specifically the residuals for margin calculation)
         with open(d2d_pkl_path, "rb") as f:
@@ -40,7 +40,11 @@ class OnlineModeSelector:
         self.base_threshold_db = self.ts.required_sinr_for_throughput(target_tput_mbps)
         
         # Calculate the specific margin (buffer) once based on the chosen constraint type and the residuals from the error analysis module.
-        if self.constraint_type == 'AR':
+        # Set margins to 0.0 dB if KDE is disabled (ablation test)
+        if not MLConfig.USE_KDE:
+            self.margin_d2d, self.margin_cell = 0.0, 0.0
+            print("⚠️ KDE Correction is DISABLED (Ablation Test). Safety Margins forced to 0.0 dB.")
+        elif self.constraint_type == 'AR':
             self.margin_d2d = self.ts.get_ar_margin(res_d2d, epsilon=MLConfig.AR_EPSILON)
             self.margin_cell = self.ts.get_ar_margin(res_cell, epsilon=MLConfig.AR_EPSILON)
         elif self.constraint_type == 'PCR':
