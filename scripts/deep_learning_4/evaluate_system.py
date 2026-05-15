@@ -65,6 +65,12 @@ def evaluate_all_models(dataset_folder):
     
     # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
     TEST_TARGET_MBPS = MLConfig.TARGET_THROUGHPUT_MBPS
+
+    # Load Target Scalers to convert Z-scores back to raw dB
+    with open(os.path.join(PROJECT_ROOT, "data", dataset_folder, "d2d", "target_scaler.pkl"), "rb") as f:
+        t_scaler_d2d = pickle.load(f)
+    with open(os.path.join(PROJECT_ROOT, "data", dataset_folder, "cellular", "target_scaler.pkl"), "rb") as f:
+        t_scaler_cell = pickle.load(f)
     
     # Loop through each model
     for model_name in models:
@@ -127,7 +133,7 @@ def evaluate_all_models(dataset_folder):
             X_d2d_batch = X_d2d.reshape(-1, X_d2d.shape[2], X_d2d.shape[3])
             X_cell_batch = X_cell.reshape(-1, X_cell.shape[2], X_cell.shape[3])
             
-            # Predict
+            # Predict the SINR values for each window
             preds_d2d_raw = model_d2d.predict(X_d2d_batch, batch_size=64, verbose=0)
             preds_cell_raw = model_cell.predict(X_cell_batch, batch_size=64, verbose=0)
             
@@ -139,6 +145,21 @@ def evaluate_all_models(dataset_folder):
             preds_d2d_flat = preds_d2d_raw.flatten()
             preds_cell_flat = preds_cell_raw.flatten()
 
+        # Inverse transform the 3D arrays back to raw dB before any metrics are calculated
+        old_shape_d2d = y_d2d.shape
+        y_d2d = t_scaler_d2d.inverse_transform(y_d2d.reshape(-1, 1)).reshape(old_shape_d2d)
+        preds_d2d = t_scaler_d2d.inverse_transform(preds_d2d.reshape(-1, 1)).reshape(old_shape_d2d)
+        
+        old_shape_cell = y_cell.shape
+        y_cell = t_scaler_cell.inverse_transform(y_cell.reshape(-1, 1)).reshape(old_shape_cell)
+        preds_cell = t_scaler_cell.inverse_transform(preds_cell.reshape(-1, 1)).reshape(old_shape_cell)
+
+        # Re-flatten for Step B and Step C calculations
+        preds_d2d_flat = preds_d2d.flatten()
+        preds_cell_flat = preds_cell.flatten()
+        y_d2d_flat = y_d2d.flatten()
+        y_cell_flat = y_cell.flatten()
+        
         inference_time_ms = ((time.time() - start_time) / len(preds_d2d_flat)) * 1000
 
         # Float32 uses 4 bytes per parameter, convert to KB for easier interpretation

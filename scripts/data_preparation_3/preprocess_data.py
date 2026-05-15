@@ -3,7 +3,7 @@ import numpy as np
 import os
 import sys
 import pickle
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
 # Import the configuration file from Simulator
@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from simulator.config import SimulationConfig
 from simulator_paper.config import PaperConfig
 
-DATASET_TYPE = 'PROPOSAL' # Options: 'PAPER' or 'PROPOSAL'
+DATASET_TYPE = 'PAPER' # Options: 'PAPER' or 'PROPOSAL'
 
 if DATASET_TYPE == 'PAPER':
     ACTIVE_CONFIG = PaperConfig
@@ -54,7 +54,7 @@ def clean_dataset(df):
     return df
 
 # Generate separate datasets for D2D and Cellular modes with engineered features and labels
-def generate_dataset_for_mode(df_raw, mode, config, folder_name):
+def generate_dataset_for_mode(df_raw, mode, folder_name):
     df = df_raw.copy()
     print(f"\n--- Generating Dataset for {mode.capitalize()} Mode ---")
     
@@ -86,9 +86,14 @@ def generate_dataset_for_mode(df_raw, mode, config, folder_name):
     features = [
         target_sinr, target_tput, 
         'distance_tx_rx', 'distance_bs_rx', 'interference_dbm',
-        'num_interferers',
         'sinr_mean_5s', 'sinr_std_5s', 'tput_mean_5s'
     ]
+
+    # Include 'num_interferers' if it exists in the dataset (only in PROPOSAL dataset)
+    if 'num_interferers' in df.columns:
+        features.append('num_interferers')
+
+    # Add/Append lagged features to the feature list
     for lag in lags:
         features.append(f'sinr_lag_{lag}')
         features.append(f'interf_lag_{lag}')
@@ -109,15 +114,24 @@ def generate_dataset_for_mode(df_raw, mode, config, folder_name):
     df.to_csv(debug_path, index=False)
     print(f"Debug file saved to {debug_path} (Open in Excel to verify features)")
 
-    # Normalize features using Min-Max Scaling
+    # Normalize features using Standard Scaling
     print("Normalizing features...")
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
     df[features] = scaler.fit_transform(df[features])
     
     # Save Scaler for future use during DL model inference
     os.makedirs(save_dir, exist_ok=True)
     with open(f"{save_dir}/scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
+
+    # Normalize the target label using Standard Scaling as well
+    print("Normalizing Target Label...")
+    target_scaler = StandardScaler()
+    df['label'] = target_scaler.fit_transform(df[['label']])
+    
+    # Save Target Scaler so we can reverse it later
+    with open(f"{save_dir}/target_scaler.pkl", "wb") as f:
+        pickle.dump(target_scaler, f)
         
     # Reshape data into sequences for DL model
     print("Reshaping data into sequences...")
@@ -163,8 +177,8 @@ def preprocess_data(config, folder_name):
     df = clean_dataset(df)
     
     # Generate both datasets independently!
-    generate_dataset_for_mode(df, 'D2D', config, folder_name)
-    generate_dataset_for_mode(df, 'CELLULAR', config, folder_name)
+    generate_dataset_for_mode(df, 'D2D', folder_name)
+    generate_dataset_for_mode(df, 'CELLULAR', folder_name)
 
 if __name__ == "__main__":
     preprocess_data(ACTIVE_CONFIG, DATASET_FOLDER)

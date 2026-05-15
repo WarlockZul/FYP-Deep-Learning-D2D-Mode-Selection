@@ -70,9 +70,21 @@ def perform_error_analysis(dataset_folder, mode):
         else:
             X_val, y_val = X_val_win, y_val_win
 
-        # Step 2.1: Compute Residuals (Error = True SINR - Predicted SINR)
+        # Step 2.1: Compute Residuals on RAW dB values (Error = True SINR - Predicted SINR)
         y_pred = model.predict(X_val, verbose=0)
-        residuals = (y_val.flatten() - y_pred.flatten())
+        
+        # Load the target scaler for this specific dataset and mode
+        scaler_path = os.path.join(PROJECT_ROOT, "data", dataset_folder, mode, "target_scaler.pkl")
+        with open(scaler_path, "rb") as f:
+            target_scaler = pickle.load(f)
+            
+        # Inverse transform both predictions and ground truth from Z-scores back to dB values
+        # (reshape is needed because StandardScaler expects 2D arrays)
+        y_pred_raw = target_scaler.inverse_transform(y_pred.reshape(-1, 1)).flatten()
+        y_val_raw_db = target_scaler.inverse_transform(y_val.reshape(-1, 1)).flatten()
+        
+        # Calculate residuals in raw dB values
+        residuals = y_val_raw_db - y_pred_raw
         
         # Step 2.2: Derive 95% Confidence Intervals
         lower_bound = np.percentile(residuals, MLConfig.CI_LOWER_PCT)

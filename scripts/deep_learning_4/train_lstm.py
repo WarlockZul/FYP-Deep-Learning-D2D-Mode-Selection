@@ -10,6 +10,17 @@ from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModu
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource]
 
+# Force TensorFlow to allocate GPU memory dynamically
+physical_devices = tf.config.list_physical_devices('GPU')
+if len(physical_devices) > 0:
+    try:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        print("✅ GPU is active and ready for training!")
+    except:
+        print("⚠️ Failed to initialize GPU memory.")
+else:
+    print("❌ No GPU found. Defaulting to CPU.")
+    
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
 if SCRIPTS_DIR not in sys.path:
