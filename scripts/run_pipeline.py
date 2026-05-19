@@ -7,9 +7,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, ".."))
 TARGET_DIR = os.path.join(PROJECT_ROOT, "scripts", "deep_learning_4")
 
 def run_script(script_name):
-    print(f"\n{'-'*50}")
+    print(f"\n{'-'*40}")
     print(f"▶ RUNNING: {script_name}")
-    print(f"{'-'*50}")
+    print(f"{'-'*40}")
     
     script_path = os.path.join(TARGET_DIR, script_name)
 
@@ -56,9 +56,9 @@ def main():
                 # Example: "ablation_win16_kdeTrue_AR"
                 exp_name = f"ablation_win{w}_kde{kde}_{constraint}"
                 
-                print(f"\n\n{'#'*70}")
+                print(f"\n\n{'#'*40}")
                 print(f"🌟 EXPERIMENT {current_experiment}/{total_experiments}: {exp_name.upper()}")
-                print(f"{'#'*70}")
+                print(f"{'#'*40}")
                 
                 # Broadcast the hyperparameters to all scripts via environment variables
                 os.environ['ML_WINDOW_SIZE'] = str(w)

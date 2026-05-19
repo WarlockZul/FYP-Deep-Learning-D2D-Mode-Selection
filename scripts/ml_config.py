@@ -1,4 +1,7 @@
 import os
+import random
+import numpy as np
+import tensorflow as tf
 
 class MLConfig:
     # ==========================================
@@ -47,5 +50,25 @@ class MLConfig:
     CONSTRAINT_TYPE = os.environ.get('ML_CONSTRAINT_TYPE', 'AR')    # 'AR' or 'PCR'
     USE_KDE = os.environ.get('ML_USE_KDE', 'True') == 'True'        # Whether to apply KDE smoothing in error analysis (True/False)
 
+    # Grab the seed from the pipeline, default to 42 if running manually
+    RANDOM_SEED = int(os.environ.get('ML_SEED', 42))
+    
     # Master Folder Routing
-    EXPERIMENT_NAME = os.environ.get('ML_EXPERIMENT_NAME', 'baseline_proposal')
+    EXPERIMENT_NAME = os.environ.get('ML_EXPERIMENT_NAME', f'run_seed_{RANDOM_SEED}')
+
+# 1. Enforce Random Seeds Globally
+os.environ['PYTHONHASHSEED'] = str(MLConfig.RANDOM_SEED)
+random.seed(MLConfig.RANDOM_SEED)
+np.random.seed(MLConfig.RANDOM_SEED)
+tf.random.set_seed(MLConfig.RANDOM_SEED)
+
+# 2. Force Colab to use the GPU & prevent memory crashes
+physical_devices = tf.config.list_physical_devices('GPU')
+if len(physical_devices) > 0:
+    try:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        print(f"✅ GPU is active! (Running Seed: {MLConfig.RANDOM_SEED})")
+    except RuntimeError as e:
+        print(f"⚠️ GPU Memory Error: {e}")
+else:
+    print(f"⚠️ No GPU found. Training on CPU. (Running Seed: {MLConfig.RANDOM_SEED})")

@@ -268,15 +268,102 @@ def evaluate_all_models(dataset_folder):
             'Switch Rate (%)': f"{switch_rate:.2f}",
             'Avg D2D Stay (s)': f"{avg_d2d_residence_s:.1f}"
         }
+
+    # Start evaluating the baseline methods (only system-level metrics are calculated)
+    print("\n" + "="*40)
+    print(" EVALUATING BASELINE METHODS")
+    print("="*40)
+
+    # 1. Convert the raw labels to dB once for the baselines
+    y_d2d_base_db = t_scaler_d2d.inverse_transform(y_test_d2d_raw.reshape(-1, 1)).reshape(y_test_d2d_raw.shape)
+    y_cell_base_db = t_scaler_cell.inverse_transform(y_test_cell_raw.reshape(-1, 1)).reshape(y_test_cell_raw.shape)
+
+    # 2. Initialize the math for the SINR Threshold baseline
+    ts = ThresholdSelector(bandwidth_hz=MLConfig.BANDWIDTH_HZ)
+    base_threshold_db = ts.required_sinr_for_throughput(TEST_TARGET_MBPS)
+
+    baseline_methods = ['pure_d2d', 'pure_cellular', 'random', 'sinr_threshold']
+
+    # Loop through each baseline method
+    for b_name in baseline_methods:
+        switches = 0
+        d2d_time = 0
+        total_throughput_mbps = 0.0
+        d2d_sessions = 0
+        total_steps = y_d2d_base_db.shape[0] * y_d2d_base_db.shape[1]
+
+        # Loop through each episode
+        for e in range(y_d2d_base_db.shape[0]):
+            current_mode = 'D2D' # Protocol states every episode starts in D2D
+            d2d_sessions += 1
+
+            # Loop through each timestep within the episode
+            for t in range(y_d2d_base_db.shape[1]):
+                true_sinr_d2d = y_d2d_base_db[e, t, 0]
+                true_sinr_cell = y_cell_base_db[e, t, 0]
+
+                # Choose mode based on the current baseline mode 
+                if b_name == 'pure_d2d':
+                    new_mode = 'D2D'
+                    
+                elif b_name == 'pure_cellular':
+                    new_mode = 'Cellular'
+                    
+                elif b_name == 'random':
+                    new_mode = 'D2D' if np.random.rand() > 0.5 else 'Cellular'
+                    
+                elif b_name == 'sinr_threshold':
+                    # Checks TRUE instantaneous SINR instead of predicting it.
+                    if current_mode == 'D2D':
+                        new_mode = 'Cellular' if true_sinr_d2d < base_threshold_db else 'D2D'
+                    else:
+                        new_mode = 'D2D' if true_sinr_cell < base_threshold_db else 'Cellular'
+
+                # Update switching rate and D2D residence time
+                if new_mode != current_mode:
+                    switches += 1
+                    if new_mode == 'D2D':
+                        d2d_sessions += 1
+
+                current_mode = new_mode
+
+                # Calculate actual throughput
+                if current_mode == 'D2D':
+                    d2d_time += 1
+                    actual_tput = ts.shannon_throughput(true_sinr_d2d)
+                else:
+                    actual_tput = ts.shannon_throughput(true_sinr_cell)
+
+                total_throughput_mbps += actual_tput
+
+        # Finalize calculations for system-level metrics
+        avg_throughput = total_throughput_mbps / total_steps
+        switch_rate = (switches / total_steps) * 100 
+        spectral_efficiency = avg_throughput / (MLConfig.BANDWIDTH_HZ / 1e6) 
+        avg_d2d_residence_s = (d2d_time / d2d_sessions) if d2d_sessions > 0 else 0.0
+
+        # Save metrics (N/A for prediction/uncertainty since no AI is used)
+        results[b_name] = {
+            'D2D MAE': "N/A", 'Cell MAE': "N/A",
+            'D2D RMSE': "N/A", 'Cell RMSE': "N/A",
+            'D2D PICP%': "N/A", 'Cell PICP%': "N/A",
+            'D2D MPIW (dB)': "N/A", 'Cell MPIW (dB)': "N/A",
+            'R2 D2D': "N/A", 'R2 Cell': "N/A",
+            'Params': "N/A", 'Mem (KB)': "N/A", 'FLOPs': "N/A", 'Inference (ms)': "N/A",
+            'Avg Tput (Mbps)': f"{avg_throughput:.2f}",
+            'Spectral Eff (bps/Hz)': f"{spectral_efficiency:.4f}",
+            'Switch Rate (%)': f"{switch_rate:.2f}",
+            'Avg D2D Stay (s)': f"{avg_d2d_residence_s:.1f}"
+        }
         
     if results:
-        print("\n" + "="*100)
+        print("\n" + "="*40)
         print(f" FINAL EVALUATION RESULTS: {dataset_folder.upper()} (Target: {TEST_TARGET_MBPS} Mbps)")
-        print("="*100)
+        print("="*40)
         df = pd.DataFrame(results).T
         print(df.to_string())
         
-        # FIX: Save results into the correct dataset-specific results folder
+        # Save results into the correct dataset-specific results folder
         save_dir = os.path.join(PROJECT_ROOT, "results", dataset_folder, MLConfig.EXPERIMENT_NAME)
         os.makedirs(save_dir, exist_ok=True)
         csv_path = os.path.join(save_dir, "final_evaluation_metrics.csv")
@@ -287,9 +374,9 @@ def evaluate_all_models(dataset_folder):
 def main():
     datasets = ['preprocessed_paper', 'preprocessed_proposal']
     for dataset in datasets:
-        print(f"\n\n{'*'*80}")
+        print(f"\n\n{'*'*40}")
         print(f"🚀 INITIATING SYSTEM EVALUATION FOR: {dataset.upper()}")
-        print(f"{'*'*80}")
+        print(f"{'*'*40}")
         evaluate_all_models(dataset)
 
 if __name__ == "__main__":

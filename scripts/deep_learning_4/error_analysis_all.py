@@ -169,9 +169,9 @@ def main():
     
     for dataset in datasets:
         for mode in modes:
-            print(f"\n{'='*60}")
+            print(f"\n{'='*40}")
             print(f"🚀 ERROR ANALYSIS | Dataset: {dataset} | Mode: {mode.upper()}")
-            print(f"{'='*60}")
+            print(f"{'='*40}")
             perform_error_analysis(dataset, mode)
 
 if __name__ == "__main__":

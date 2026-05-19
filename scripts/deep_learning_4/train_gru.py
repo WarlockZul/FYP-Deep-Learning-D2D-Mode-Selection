@@ -10,17 +10,6 @@ from tensorflow.keras.optimizers import Adam # pyright: ignore[reportMissingModu
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 from tensorflow.keras.regularizers import l2 # pyright: ignore[reportMissingModuleSource, reportMissingImports]
 
-# Force TensorFlow to allocate GPU memory dynamically
-physical_devices = tf.config.list_physical_devices('GPU')
-if len(physical_devices) > 0:
-    try:
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
-        print("✅ GPU is active and ready for training!")
-    except:
-        print("⚠️ Failed to initialize GPU memory.")
-else:
-    print("❌ No GPU found. Defaulting to CPU.")
-    
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.abspath(os.path.join(current_dir, ".."))
 if SCRIPTS_DIR not in sys.path:
@@ -28,19 +17,6 @@ if SCRIPTS_DIR not in sys.path:
 PROJECT_ROOT = os.path.abspath(os.path.join(current_dir, "../../"))
 
 from ml_config import MLConfig
-
-# Function to ensure deterministic/constant outputs for every run
-def set_seeds(seed_value=MLConfig.RANDOM_SEED):
-    os.environ['PYTHONHASHSEED'] = str(seed_value)
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    tf.random.set_seed(seed_value)
-    
-    # Force TensorFlow to use deterministic operations where possible
-    os.environ['TF_DETERMINISTIC_OPS'] = '1'
-
-# Call the function immediately
-set_seeds(MLConfig.RANDOM_SEED)
 
 # Load the processed data (train and validation sets) from data/model_ready/
 def load_processed_data(dataset_folder, mode):
