@@ -23,7 +23,7 @@ class ThresholdSelector:
         throughput_bps = self.bandwidth_hz * np.log2(1 + sinr_linear)
         return throughput_bps / 1e6  # Return in Mbps
 
-    # Inverse Shannon formula: Finds the minimum SINR (dB) required to hit a target Throughput.
+    # Inverse Shannon formula: Finds the minimum SINR (dB) required to hit the target throughput.
     def required_sinr_for_throughput(self, target_tput_mbps):
         target_bps = target_tput_mbps * 1e6
         sinr_linear = (2 ** (target_bps / self.bandwidth_hz)) - 1

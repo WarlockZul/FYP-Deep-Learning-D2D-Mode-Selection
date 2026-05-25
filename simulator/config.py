@@ -43,7 +43,7 @@ class SimulationConfig:
     PATH_LOSS_D2D_C_DIST = 20       # Factor for distance log
     
     # Shadowing and Fading Parameters
-    SHADOWING_SIGMA_DB = 6          # Fixed sigma (Average of 4-8)
+    SHADOWING_SIGMA_DB = 4          # Fixed sigma (Average of 4-8)
     
     # Mobility & Environment Settings
     TIME_STEP_S = 1                 # Delta t = 1s

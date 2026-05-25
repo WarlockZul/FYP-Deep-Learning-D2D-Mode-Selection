@@ -20,6 +20,10 @@ class OnlineModeSelector:
         self.model_name = model_name
         self.dataset_folder = dataset_folder
         self.constraint_type = constraint_type
+
+        # Fetch the target throughput from the config, or use the default provided value. 
+        if target_tput_mbps is None:
+            target_tput_mbps = MLConfig.TARGET_THROUGHPUT_MBPS.get(self.dataset_folder, 1.0)
         
         # Initialize parameters
         print(f"Initializing Online Mode Selector ({model_name.upper()} model | {constraint_type} constraint)")

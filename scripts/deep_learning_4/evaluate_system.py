@@ -64,7 +64,7 @@ def evaluate_all_models(dataset_folder):
     results = {}
     
     # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
-    TEST_TARGET_MBPS = MLConfig.TARGET_THROUGHPUT_MBPS
+    TEST_TARGET_MBPS = MLConfig.TARGET_THROUGHPUT_MBPS[dataset_folder]
 
     # Load Target Scalers to convert Z-scores back to raw dB
     with open(os.path.join(PROJECT_ROOT, "data", dataset_folder, "d2d", "target_scaler.pkl"), "rb") as f:
@@ -305,19 +305,12 @@ def evaluate_all_models(dataset_folder):
                 # Choose mode based on the current baseline mode 
                 if b_name == 'pure_d2d':
                     new_mode = 'D2D'
-                    
                 elif b_name == 'pure_cellular':
                     new_mode = 'Cellular'
-                    
                 elif b_name == 'random':
                     new_mode = 'D2D' if np.random.rand() > 0.5 else 'Cellular'
-                    
                 elif b_name == 'sinr_threshold':
-                    # Checks TRUE instantaneous SINR instead of predicting it.
-                    if current_mode == 'D2D':
-                        new_mode = 'Cellular' if true_sinr_d2d < base_threshold_db else 'D2D'
-                    else:
-                        new_mode = 'D2D' if true_sinr_cell < base_threshold_db else 'Cellular'
+                    new_mode = 'Cellular' if true_sinr_d2d < MLConfig.BASELINE_SINR_THRESHOLD_DB else 'D2D'
 
                 # Update switching rate and D2D residence time
                 if new_mode != current_mode:

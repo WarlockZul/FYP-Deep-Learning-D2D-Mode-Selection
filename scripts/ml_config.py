@@ -9,12 +9,12 @@ class MLConfig:
     # ==========================================
     RANDOM_SEED = 42
     # WINDOW_SIZE = 16          # Timesteps for CNN/DNN sliding windows
-    BATCH_SIZE = 64
-    EPOCHS = 100
-    LEARNING_RATE = 0.001
+    BATCH_SIZE = 16
+    EPOCHS = 150
+    LEARNING_RATE = 0.0005
     L2_REGULARIZATION = 0.00001
     DROPOUT_RATE = 0.2
-    EARLY_STOPPING_PATIENCE = 8
+    EARLY_STOPPING_PATIENCE = 25
 
     # ==========================================
     # Error Analysis Module (Statistical Parameters)
@@ -38,9 +38,13 @@ class MLConfig:
     # ==========================================
     # System Evaluation & Online Selector
     # ==========================================
-    TARGET_THROUGHPUT_MBPS = 1.0  # Ablation variable: 1.0 Mbps or 10.0 Mbps
+    TARGET_THROUGHPUT_MBPS = {
+        'preprocessed_paper': 50.0,   # High threshold to force handovers in clean environment
+        'preprocessed_proposal': 1.0  # Lower threshold for heavy interference environment
+    }
     # CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
     MODELS_TO_EVALUATE = ['gru', 'lstm', 'cnn', 'dnn']
+    BASELINE_SINR_THRESHOLD_DB = 0  # SINR threshold in dB for the baseline policy
 
     # ==========================================
     # Ablation Study Parameters
@@ -53,7 +57,7 @@ class MLConfig:
     # Grab the seed from the pipeline, default to 42 if running manually
     RANDOM_SEED = int(os.environ.get('ML_SEED', 42))
     
-    # Master Folder Routing
+    # Master Folder Routing (if there are no ablation experiments, it will default to a standard name based on the seed)
     EXPERIMENT_NAME = os.environ.get('ML_EXPERIMENT_NAME', f'run_seed_{RANDOM_SEED}')
 
 # 1. Enforce Random Seeds Globally
