@@ -39,8 +39,8 @@ class MLConfig:
     # System Evaluation & Online Selector
     # ==========================================
     TARGET_THROUGHPUT_MBPS = {
-        'preprocessed_paper': 50.0,   # High threshold to force handovers in clean environment
-        'preprocessed_proposal': 1.0  # Lower threshold for heavy interference environment
+        'preprocessed_paper': 2.0,   # High threshold to force handovers in clean environment
+        'preprocessed_proposal': 0.1  # Lower threshold for heavy interference environment
     }
     # CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
     MODELS_TO_EVALUATE = ['gru', 'lstm', 'cnn', 'dnn']

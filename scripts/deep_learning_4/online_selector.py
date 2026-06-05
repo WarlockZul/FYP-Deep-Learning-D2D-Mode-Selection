@@ -65,7 +65,7 @@ class OnlineModeSelector:
         new_mode = current_mode
 
         if current_mode == 'D2D':
-            # Step 2: Confidence Bound Correction (Step 1 is now done outside)
+            # Step 2: Confidence Bound Correction (Step 1 is done in the threshold selection file)
             corrected_pred = self.ts.get_corrected_sinr(pred_d2d, self.margin_d2d)
             
             # Step 3: Flowchart Logic: If D2D prediction falls below threshold, switch to Cellular.
