@@ -12,7 +12,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from simulator.config import SimulationConfig
 from simulator_paper.config import PaperConfig
 
-DATASET_TYPE = 'PAPER' # Options: 'PAPER' or 'PROPOSAL'
+DATASET_TYPE = 'PROPOSAL' # Options: 'PAPER' or 'PROPOSAL'
+current_seed = 42
 
 if DATASET_TYPE == 'PAPER':
     ACTIVE_CONFIG = PaperConfig
@@ -154,8 +155,12 @@ def generate_dataset_for_mode(df_raw, mode, folder_name):
 
     # Split data into Training (70%), Validation (15%), and Testing (15%)
     print("Splitting data into Training, Validation, and Testing sets...")
-    X_train, X_temp, y_train, y_temp = train_test_split(X_seq, y_seq, test_size=0.30, random_state=42)
-    X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.50, random_state=42)
+    X_train, X_temp, y_train, y_temp = train_test_split(
+        X_seq, y_seq, test_size=0.30, random_state=current_seed, shuffle=True
+    )
+    X_val, X_test, y_val, y_test = train_test_split(
+        X_temp, y_temp, test_size=0.50, random_state=current_seed, shuffle=True
+    )
     
     print(f"Training Sets (70%):   X={X_train.shape}, y={y_train.shape}")
     print(f"Validation Sets (15%): X={X_val.shape},   y={y_val.shape}")

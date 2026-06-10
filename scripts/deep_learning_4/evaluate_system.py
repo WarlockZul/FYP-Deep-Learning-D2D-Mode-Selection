@@ -66,6 +66,9 @@ def evaluate_all_models(dataset_folder):
     # Target parameter for system-level evaluation (the Mbps threshold to achieve in the real system).
     TEST_TARGET_MBPS = MLConfig.TARGET_THROUGHPUT_MBPS[dataset_folder]
 
+    # Calculate the penalty factor from the MLConfig
+    penalty_factor = 1.0 - MLConfig.HANDOVER_LATENCY
+
     # Load Target Scalers to convert Z-scores back to raw dB
     with open(os.path.join(PROJECT_ROOT, "data", dataset_folder, "d2d", "target_scaler.pkl"), "rb") as f:
         t_scaler_d2d = pickle.load(f)
@@ -225,9 +228,10 @@ def evaluate_all_models(dataset_folder):
                 
                 # Pass predictions instead of features
                 new_mode, logs = selector.make_decision(pred_d2d, pred_cell, current_mode)
-                
+                switched = (new_mode != current_mode)
+
                 # Update switching rate and D2D residence time based on the new mode decision
-                if new_mode != current_mode:
+                if switched:
                     switches += 1
                     if new_mode == 'D2D':
                         d2d_sessions += 1
@@ -238,6 +242,10 @@ def evaluate_all_models(dataset_folder):
                     actual_tput = selector.ts.shannon_throughput(true_sinr_d2d)
                 else:
                     actual_tput = selector.ts.shannon_throughput(true_sinr_cell)
+                
+                # Apply handover latency penalty for high switching rates
+                if switched:
+                    actual_tput *= penalty_factor
                     
                 total_throughput_mbps += actual_tput
                 
@@ -312,8 +320,11 @@ def evaluate_all_models(dataset_folder):
                 elif b_name == 'sinr_threshold':
                     new_mode = 'Cellular' if true_sinr_d2d < MLConfig.BASELINE_SINR_THRESHOLD_DB else 'D2D'
 
+                # Track if a switch actually occurred for the switching rate metric
+                switched = (new_mode != current_mode)
+
                 # Update switching rate and D2D residence time
-                if new_mode != current_mode:
+                if switched:
                     switches += 1
                     if new_mode == 'D2D':
                         d2d_sessions += 1
@@ -326,6 +337,10 @@ def evaluate_all_models(dataset_folder):
                     actual_tput = ts.shannon_throughput(true_sinr_d2d)
                 else:
                     actual_tput = ts.shannon_throughput(true_sinr_cell)
+
+                # Apply Handover Latency Penalty if a switch occurred
+                if switched:
+                    actual_tput *= penalty_factor
 
                 total_throughput_mbps += actual_tput
 

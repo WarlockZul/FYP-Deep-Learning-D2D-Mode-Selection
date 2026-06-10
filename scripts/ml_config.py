@@ -45,6 +45,7 @@ class MLConfig:
     # CONSTRAINT_TYPE = 'AR'        # Default constraint applied: 'AR' or 'PCR'
     MODELS_TO_EVALUATE = ['gru', 'lstm', 'cnn', 'dnn']
     BASELINE_SINR_THRESHOLD_DB = 0  # SINR threshold in dB for the baseline policy
+    HANDOVER_LATENCY = 0.05         # Throughput penalty factor applied during handovers (e.g., 20% reduction)
 
     # ==========================================
     # Ablation Study Parameters

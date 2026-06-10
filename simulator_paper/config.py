@@ -5,14 +5,14 @@ class PaperConfig:
     NUM_EPISODES = 100              # How many separate runs to do
     STEPS_PER_EPISODE = 100         # Duration of each run (seconds)
     D2D_MAX_DIST_M = 400            # Maximum distance to consider D2D pairing feasible
-    SEED = 42                       # For reproducibility
+    SEED = 44                       # For reproducibility
     OUTPUT_FILE = "data/raw/test_simulation_data.csv"
     
     # Mobility Settings
     PROBABILITY_START_MOVING = 1.00 # Probability that a UE starts moving in a time step
 
     # Channel Model Settings
-    INTERFERENCE_LOAD_FACTOR = 0.5  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
+    INTERFERENCE_LOAD_FACTOR = 0.9  # Default to 1.0 (Full load/Worst Case). Lower values reduce interference.
     BANDWIDTH_HZ = 100e6            # System Bandwidth
     NOISE_POWER_DBM = -174 + 10 * np.log10(BANDWIDTH_HZ) # Thermal Noise in dBm
     HANDOVER_LATENCY_S = 0.050      # Handover latency in seconds (50 ms)
